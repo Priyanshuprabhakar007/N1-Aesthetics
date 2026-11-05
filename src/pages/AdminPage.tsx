@@ -28,7 +28,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useCms, AppointmentEnquiryRecord, LiveSiteSettings } from '../context/CmsContext';
 import { siteContent, TreatmentItem } from '../content/site';
 import { SeoHead } from '../components/SeoHead';
@@ -43,18 +43,67 @@ type AdminTab =
   | 'blog_seo'
   | 'roles_checklist';
 
+type AllowedStorageFolder =
+  | 'treatments'
+  | 'doctor'
+  | 'clinical_results_consented'
+  | 'clinical_results_private';
+
+const ALLOWED_STORAGE_FOLDERS = new Set<AllowedStorageFolder>([
+  'treatments',
+  'doctor',
+  'clinical_results_consented',
+  'clinical_results_private',
+]);
+
 /**
  * Client-side media validation & optimization utility:
- * Validates MIME type (JPEG/PNG/WebP) and size (<= 5MB), then compresses/resizes
- * via HTML5 Canvas to WebP (max 1200px) and uploads to Firebase Storage (or returns optimized data URI).
+ * - Verifies authenticated & email-verified staff user
+ * - Validates MIME type (JPEG/PNG/WebP), file extension, and size (> 0 and <= 5MB)
+ * - Validates allowed storage folder and sanitizes path to prevent path traversal or overwrites
+ * - Attaches custom metadata (uploadedByUid, consentVerified, published, consentReference)
  */
-async function optimizeAndUploadMedia(file: File, folder: string): Promise<string> {
+async function optimizeAndUploadMedia(
+  file: File,
+  folder: AllowedStorageFolder,
+  options?: {
+    consentVerified?: boolean;
+    published?: boolean;
+    consentReference?: string;
+  }
+): Promise<string> {
+  const currentUser = auth.currentUser;
+  if (!currentUser || !currentUser.emailVerified) {
+    throw new Error('Verified staff authentication is required to upload media.');
+  }
+
+  if (!ALLOWED_STORAGE_FOLDERS.has(folder)) {
+    throw new Error('Invalid storage destination folder.');
+  }
+
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP images are permitted.');
   }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error('File exceeds 5MB limit. Please select a smaller image.');
+
+  if (!/\.(jpe?g|png|webp)$/i.test(file.name)) {
+    throw new Error('Invalid file extension. Only .jpg, .jpeg, .png, and .webp files are allowed.');
+  }
+
+  if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+    throw new Error('File must be non-empty and not exceed the 5MB limit.');
+  }
+
+  if (folder === 'clinical_results_consented') {
+    if (
+      !options?.consentVerified ||
+      !options?.consentReference ||
+      options.consentReference.trim().length < 2
+    ) {
+      throw new Error(
+        'Clinical photographs cannot be uploaded to the consented archive without documented patient consent and a valid Consent Reference ID.'
+      );
+    }
   }
 
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -94,19 +143,33 @@ async function optimizeAndUploadMedia(file: File, folder: string): Promise<strin
   });
 
   try {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `n7_media/${folder}/${Date.now()}_${safeName}.webp`;
+    const baseName = file.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 48);
+    const randomSuffix = Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 8) || 'asset';
+    const path = `n7_media/${folder}/${Date.now()}_${randomSuffix}_${baseName || 'image'}.webp`;
     const sRef = storageRef(storage, path);
-    await uploadString(sRef, optimizedDataUrl, 'data_url');
+    await uploadString(sRef, optimizedDataUrl, 'data_url', {
+      contentType: 'image/webp',
+      customMetadata: {
+        uploadedByUid: currentUser.uid,
+        consentVerified: options?.consentVerified ? 'true' : 'false',
+        published: options?.published ? 'true' : 'false',
+        consentReference: (options?.consentReference || '').trim().slice(0, 160),
+      },
+    });
     const url = await getDownloadURL(sRef);
     return url;
   } catch {
-    // If storage bucket permissions are not yet configured, return compressed data URL if within Firestore 1000-char limit or notify
-    if (optimizedDataUrl.length <= 980) {
+    if (
+      (folder === 'treatments' || folder === 'doctor') &&
+      optimizedDataUrl.length <= 980
+    ) {
       return optimizedDataUrl;
     }
     throw new Error(
-      'Image optimized, but Firebase Storage bucket requires write rules or use a hosted /public/media/ path.'
+      'Image optimized, but Firebase Storage bucket requires write rules (see storage.rules) or use a hosted /public/media/ path.'
     );
   }
 }
@@ -301,24 +364,42 @@ export function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Add staff role (Admin only)
+  // Add or update staff role (Admin only, preserving immutable createdAt on update)
   const handleAddStaffRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'admin' || !newStaffUid.trim() || !newStaffEmail.trim()) return;
+    if (role !== 'admin') return;
     const uid = newStaffUid.trim();
+    const email = newStaffEmail.trim();
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(uid)) {
+      showNotice('error', 'Please enter a valid Firebase User UID (1–128 alphanumeric characters).');
+      return;
+    }
+    if (email.length < 3 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showNotice('error', 'Please enter a valid staff email address.');
+      return;
+    }
     const path = `staff_roles/${uid}`;
+    const existsAlready = staffRoles.some((sr) => sr.uid === uid);
     try {
-      await setDoc(doc(db, 'staff_roles', uid), {
-        uid,
-        email: newStaffEmail.trim(),
-        role: newStaffRole,
-        createdAt: serverTimestamp(),
-      });
+      if (existsAlready) {
+        await updateDoc(doc(db, 'staff_roles', uid), {
+          email,
+          role: newStaffRole,
+        });
+      } else {
+        await setDoc(doc(db, 'staff_roles', uid), {
+          uid,
+          email,
+          role: newStaffRole,
+          createdAt: serverTimestamp(),
+        });
+      }
       setNewStaffUid('');
       setNewStaffEmail('');
-      showNotice('success', `Assigned ${newStaffRole} role to ${newStaffEmail}`);
+      showNotice('success', `Assigned ${newStaffRole} role to ${email}`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
+      showNotice('error', 'Failed to assign staff role. Verify admin permissions.');
+      handleFirestoreError(error, existsAlready ? OperationType.UPDATE : OperationType.CREATE, path);
     }
   };
 
@@ -743,8 +824,12 @@ export function AdminPage() {
                   <button
                     type="button"
                     onClick={async () => {
-                      await upsertTreatment(treatmentForm);
-                      showNotice('success', `Saved treatment ${treatmentForm.title}`);
+                      try {
+                        await upsertTreatment(treatmentForm);
+                        showNotice('success', `Saved treatment ${treatmentForm.title}`);
+                      } catch (err: any) {
+                        showNotice('error', err?.message || 'Unable to save treatment.');
+                      }
                     }}
                     className="w-full bg-[#30251F] hover:bg-[#211A17] text-[#F5EEE8] py-3 rounded-full font-medium cursor-pointer"
                   >
@@ -962,8 +1047,12 @@ export function AdminPage() {
               <button
                 type="button"
                 onClick={async () => {
-                  await saveSiteSettings(settingsForm);
-                  showNotice('success', 'Doctor profile & clinic contact settings saved.');
+                  try {
+                    await saveSiteSettings(settingsForm);
+                    showNotice('success', 'Doctor profile & clinic contact settings saved.');
+                  } catch (err: any) {
+                    showNotice('error', err?.message || 'Unable to save clinic settings.');
+                  }
                 }}
                 className="bg-[#30251F] hover:bg-[#211A17] text-[#F5EEE8] text-xs font-medium px-6 py-3.5 rounded-full cursor-pointer"
               >
@@ -1050,15 +1139,19 @@ export function AdminPage() {
                   type="button"
                   disabled={!testimonialForm.consentVerified || testimonialForm.quote.length < 10}
                   onClick={async () => {
-                    await upsertTestimonial(testimonialForm);
-                    setTestimonialForm({
-                      patientIdentifier: '',
-                      procedureContext: 'Rhinoplasty',
-                      quote: '',
-                      consentVerified: false,
-                      published: false,
-                    });
-                    showNotice('success', 'Consented testimonial saved.');
+                    try {
+                      await upsertTestimonial(testimonialForm);
+                      setTestimonialForm({
+                        patientIdentifier: '',
+                        procedureContext: 'Rhinoplasty',
+                        quote: '',
+                        consentVerified: false,
+                        published: false,
+                      });
+                      showNotice('success', 'Consented testimonial saved.');
+                    } catch (err: any) {
+                      showNotice('error', err?.message || 'Unable to save testimonial.');
+                    }
                   }}
                   className="w-full bg-[#30251F] disabled:opacity-40 text-[#F5EEE8] py-3 rounded-full font-medium cursor-pointer"
                 >
@@ -1175,8 +1268,12 @@ export function AdminPage() {
                   type="button"
                   disabled={!resultForm.consentVerified || !resultForm.consentReference.trim()}
                   onClick={async () => {
-                    await upsertClinicalResult(resultForm);
-                    showNotice('success', 'Consented clinical case saved.');
+                    try {
+                      await upsertClinicalResult(resultForm);
+                      showNotice('success', 'Consented clinical case saved.');
+                    } catch (err: any) {
+                      showNotice('error', err?.message || 'Unable to save clinical case.');
+                    }
                   }}
                   className="w-full bg-[#30251F] disabled:opacity-40 text-[#F5EEE8] py-3 rounded-full font-medium cursor-pointer"
                 >
@@ -1275,8 +1372,12 @@ export function AdminPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await upsertBlogPost(blogForm);
-                    showNotice('success', 'Blog resource & SEO saved.');
+                    try {
+                      await upsertBlogPost(blogForm);
+                      showNotice('success', 'Blog resource & SEO saved.');
+                    } catch (err: any) {
+                      showNotice('error', err?.message || 'Unable to save blog resource.');
+                    }
                   }}
                   className="w-full bg-[#30251F] text-[#F5EEE8] py-3 rounded-full font-medium cursor-pointer"
                 >

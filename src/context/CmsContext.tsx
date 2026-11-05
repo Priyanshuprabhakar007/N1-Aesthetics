@@ -83,7 +83,7 @@ interface CmsContextValue {
     preferredDate: string;
     message?: string;
     privacyConsent: boolean;
-  }) => Promise<void>;
+  }) => Promise<string>;
   saveSiteSettings: (next: LiveSiteSettings) => Promise<void>;
   upsertTreatment: (treatment: TreatmentItem) => Promise<void>;
   deleteTreatment: (slug: string) => Promise<void>;
@@ -155,7 +155,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     siteContent.resourcesBlog.articles
   );
 
-  // 1. Track Firebase Auth & Staff Role
+  // 1. Track Firebase Auth & Staff Role (requires verified email)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -165,8 +165,15 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Check bootstrapped admin email first
-      if (currentUser.emailVerified && currentUser.email === 'dilseinvite@gmail.com') {
+      // Enforce verified email before any role assignment or role document lookup
+      if (!currentUser.emailVerified) {
+        setRole('unauthorized');
+        setAuthReady(true);
+        return;
+      }
+
+      // Check bootstrapped admin email first (flagged for clinic owner confirmation)
+      if (currentUser.email === 'dilseinvite@gmail.com') {
         setRole('admin');
         setAuthReady(true);
         return;
@@ -388,7 +395,23 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
   };
 
-  // Submit public consultation enquiry to Firestore (with strict volumetric truncation)
+  const requireStaffUser = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.emailVerified || (role !== 'admin' && role !== 'editor')) {
+      throw new Error('Verified staff authentication (admin or editor) is required.');
+    }
+    return currentUser;
+  };
+
+  const requireAdminUser = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.emailVerified || role !== 'admin') {
+      throw new Error('Verified administrator authorization is required.');
+    }
+    return currentUser;
+  };
+
+  // Submit public consultation enquiry to Firestore (with strict volumetric & schema validation)
   const submitEnquiryToCms = async (payload: {
     name: string;
     phone: string;
@@ -397,21 +420,42 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     preferredDate: string;
     message?: string;
     privacyConsent: boolean;
-  }) => {
-    const enquiryId = `enq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }): Promise<string> => {
+    const trimmedName = payload.name.trim().slice(0, 120);
+    const trimmedPhone = payload.phone.trim().slice(0, 30);
+    const trimmedTreatment = payload.treatment.trim().slice(0, 120);
+    const trimmedDate = payload.preferredDate.trim().slice(0, 20);
+
+    if (
+      trimmedName.length < 2 ||
+      trimmedPhone.length < 7 ||
+      !/^[0-9+()\- \s]{7,30}$/.test(trimmedPhone) ||
+      trimmedTreatment.length < 2 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate) ||
+      payload.privacyConsent !== true
+    ) {
+      throw new Error('Invalid consultation enquiry fields or missing privacy consent.');
+    }
+
+    const randomPart = Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 8) || 'n7enq1';
+    const enquiryId = `enq_${Date.now()}_${randomPart}`;
     const docData: Record<string, any> = {
-      name: payload.name.trim().slice(0, 120),
-      phone: payload.phone.trim().slice(0, 30),
-      treatment: payload.treatment.trim().slice(0, 120),
-      preferredDate: payload.preferredDate.trim().slice(0, 20),
-      privacyConsent: Boolean(payload.privacyConsent),
+      name: trimmedName,
+      phone: trimmedPhone,
+      treatment: trimmedTreatment,
+      preferredDate: trimmedDate,
+      privacyConsent: true,
       status: 'new',
       assignedTo: 'unassigned',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     if (payload.email && payload.email.trim()) {
-      docData.email = payload.email.trim().slice(0, 254);
+      const trimmedEmail = payload.email.trim().slice(0, 254);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        throw new Error('Invalid optional email address format.');
+      }
+      docData.email = trimmedEmail;
     }
     if (payload.message && payload.message.trim()) {
       docData.message = payload.message.trim().slice(0, 500);
@@ -420,20 +464,25 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     const path = `appointment_enquiries/${enquiryId}`;
     try {
       await setDoc(doc(db, 'appointment_enquiries', enquiryId), docData);
+      return enquiryId;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
     }
   };
 
   const saveSiteSettings = async (next: LiveSiteSettings) => {
-    if (!auth.currentUser) throw new Error('Authentication required');
+    const currentUser = requireStaffUser();
+    const doctorName = next.doctorName.trim().slice(0, 120);
+    if (doctorName.length < 2) {
+      throw new Error('Doctor name must be at least 2 characters.');
+    }
     const path = 'site_settings/main';
     try {
       await setDoc(doc(db, 'site_settings', 'main'), {
-        doctorName: next.doctorName.trim().slice(0, 120),
+        doctorName,
         doctorRole: next.doctorRole.trim().slice(0, 160),
         doctorShortIntro: next.doctorShortIntro.trim().slice(0, 800),
-        doctorPortraitUrl: next.doctorPortraitUrl.trim().slice(0, 1000),
+        doctorPortraitUrl: next.doctorPortraitUrl.trim().slice(0, 1000) || defaultSettings.doctorPortraitUrl,
         credentialsVerified: Boolean(next.credentialsVerified),
         phone: next.phone.trim().slice(0, 60),
         whatsappNumber: next.whatsappNumber.trim().slice(0, 40),
@@ -442,7 +491,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
         address: next.address.trim().slice(0, 300),
         hours: next.hours.trim().slice(0, 160),
         bookingLiveMode: Boolean(next.bookingLiveMode),
-        authorUid: auth.currentUser.uid,
+        authorUid: currentUser.uid,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -451,24 +500,37 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const upsertTreatment = async (t: TreatmentItem) => {
-    if (!auth.currentUser) throw new Error('Authentication required');
+    const currentUser = requireStaffUser();
     const safeSlug = t.slug
+      .trim()
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
+      .replace(/^-+|-+$/g, '')
       .slice(0, 100);
+    if (safeSlug.length < 2) {
+      throw new Error('Treatment slug must be at least 2 alphanumeric characters.');
+    }
+    const title = t.title.trim().slice(0, 140);
+    const shortTitle = (t.shortTitle || t.title).trim().slice(0, 80);
+    const summary = t.summary.trim().slice(0, 600);
+    const overview = t.overview.trim().slice(0, 2500);
+    if (title.length < 2 || shortTitle.length < 2 || summary.length < 2 || overview.length < 2) {
+      throw new Error('Treatment title, short title, summary, and overview must each be at least 2 characters.');
+    }
+
     const path = `treatments/${safeSlug}`;
     try {
       await setDoc(doc(db, 'treatments', safeSlug), {
         slug: safeSlug,
-        title: t.title.trim().slice(0, 140),
-        shortTitle: t.shortTitle.trim().slice(0, 80),
-        category: t.category.trim().slice(0, 80),
-        summary: t.summary.trim().slice(0, 600),
-        overview: t.overview.trim().slice(0, 2500),
-        cardImage: t.cardImage.trim().slice(0, 1000),
+        title,
+        shortTitle,
+        category: (t.category || 'Surgical Procedures').trim().slice(0, 80),
+        summary,
+        overview,
+        cardImage: t.cardImage.trim().slice(0, 1000) || '/media/treatment-skin-rejuvenation.jpg',
         approvalStatus: t.approvalStatus,
         isSignature: Boolean(t.isSignature),
-        authorUid: auth.currentUser.uid,
+        authorUid: currentUser.uid,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -477,6 +539,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTreatment = async (slug: string) => {
+    requireAdminUser();
     const path = `treatments/${slug}`;
     try {
       await deleteDoc(doc(db, 'treatments', slug));
@@ -493,17 +556,25 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     consentVerified: boolean;
     published: boolean;
   }) => {
-    if (!auth.currentUser) throw new Error('Authentication required');
-    const docId = item.id || `test_${Date.now()}`;
+    const currentUser = requireStaffUser();
+    const patientIdentifier = item.patientIdentifier.trim().slice(0, 100);
+    const quote = item.quote.trim().slice(0, 1200);
+    if (patientIdentifier.length < 2) {
+      throw new Error('Patient identifier must be at least 2 characters.');
+    }
+    if (quote.length < 10) {
+      throw new Error('Testimonial quote must be at least 10 characters.');
+    }
+    const docId = item.id && /^[a-zA-Z0-9_-]{1,128}$/.test(item.id) ? item.id : `test_${Date.now()}`;
     const path = `testimonials/${docId}`;
     try {
       await setDoc(doc(db, 'testimonials', docId), {
-        patientIdentifier: item.patientIdentifier.trim().slice(0, 100),
+        patientIdentifier,
         procedureContext: item.procedureContext.trim().slice(0, 120),
-        quote: item.quote.trim().slice(0, 1200),
+        quote,
         consentVerified: Boolean(item.consentVerified),
         published: Boolean(item.consentVerified && item.published),
-        authorUid: auth.currentUser.uid,
+        authorUid: currentUser.uid,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -512,6 +583,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTestimonial = async (id: string) => {
+    requireAdminUser();
     const path = `testimonials/${id}`;
     try {
       await deleteDoc(doc(db, 'testimonials', id));
@@ -531,20 +603,31 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     consentVerified: boolean;
     published: boolean;
   }) => {
-    if (!auth.currentUser) throw new Error('Authentication required');
-    const docId = item.id || `res_${Date.now()}`;
+    const currentUser = requireStaffUser();
+    const safeSlug = item.treatmentSlug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 100);
+    const treatmentTitle = item.treatmentTitle.trim().slice(0, 140);
+    const consentReference = item.consentReference.trim().slice(0, 160);
+    if (safeSlug.length < 2 || treatmentTitle.length < 2 || consentReference.length < 2) {
+      throw new Error('Treatment title, slug, and signed consent reference ID (min 2 chars) are required.');
+    }
+    const docId = item.id && /^[a-zA-Z0-9_-]{1,128}$/.test(item.id) ? item.id : `res_${Date.now()}`;
     const path = `clinical_results/${docId}`;
     try {
       await setDoc(doc(db, 'clinical_results', docId), {
-        treatmentSlug: item.treatmentSlug.trim().slice(0, 100),
-        treatmentTitle: item.treatmentTitle.trim().slice(0, 140),
+        treatmentSlug: safeSlug,
+        treatmentTitle,
         beforeImage: item.beforeImage.trim().slice(0, 1000),
         afterImage: item.afterImage.trim().slice(0, 1000),
         clinicalNotes: item.clinicalNotes.trim().slice(0, 1000),
-        consentReference: item.consentReference.trim().slice(0, 160),
+        consentReference,
         consentVerified: Boolean(item.consentVerified),
         published: Boolean(item.consentVerified && item.published),
-        authorUid: auth.currentUser.uid,
+        authorUid: currentUser.uid,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -553,6 +636,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteClinicalResult = async (id: string) => {
+    requireAdminUser();
     const path = `clinical_results/${id}`;
     try {
       await deleteDoc(doc(db, 'clinical_results', id));
@@ -571,23 +655,29 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
     seoDescription: string;
     published: boolean;
   }) => {
-    if (!auth.currentUser) throw new Error('Authentication required');
+    const currentUser = requireStaffUser();
     const safeSlug = item.slug
+      .trim()
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
+      .replace(/^-+|-+$/g, '')
       .slice(0, 120);
+    const title = item.title.trim().slice(0, 180);
+    if (safeSlug.length < 2 || title.length < 3) {
+      throw new Error('Blog article slug (min 2 chars) and title (min 3 chars) are required.');
+    }
     const path = `blog_posts/${safeSlug}`;
     try {
       await setDoc(doc(db, 'blog_posts', safeSlug), {
         slug: safeSlug,
-        title: item.title.trim().slice(0, 180),
+        title,
         category: item.category.trim().slice(0, 80),
         excerpt: item.excerpt.trim().slice(0, 600),
         readingTime: item.readingTime.trim().slice(0, 40),
         seoTitle: item.seoTitle.trim().slice(0, 120),
         seoDescription: item.seoDescription.trim().slice(0, 240),
         published: Boolean(item.published),
-        authorUid: auth.currentUser.uid,
+        authorUid: currentUser.uid,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -596,6 +686,7 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteBlogPost = async (slug: string) => {
+    requireAdminUser();
     const path = `blog_posts/${slug}`;
     try {
       await deleteDoc(doc(db, 'blog_posts', slug));

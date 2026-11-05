@@ -262,8 +262,9 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
       if (settings.bookingLiveMode) {
         // Step 1: Save live enquiry to Firebase Firestore (source of truth).
         // If Firestore save fails, never display a successful booking confirmation.
+        let createdEnquiryId = '';
         try {
-          await submitEnquiryToCms({
+          createdEnquiryId = await submitEnquiryToCms({
             name: form.name,
             phone: form.phone,
             email: form.email || undefined,
@@ -284,12 +285,15 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
           return;
         }
 
-        // Step 2: Trigger optional server-side notification via /api/appointments and check result.
+        // Step 2: Trigger optional server-side notification via /api/appointments with the created enquiryId.
         try {
           const response = await fetch(siteContent.bookingConfig.endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify({
+              ...requestBody,
+              enquiryId: createdEnquiryId,
+            }),
           });
           const data = await response.json().catch(() => null);
 

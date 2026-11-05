@@ -1,0 +1,99 @@
+rules_version = '2';
+
+// PROPOSED FIREBASE STORAGE SECURITY RULES FOR N7 AESTHETICS
+// Status: Proposed in repository — requires manual deployment in Firebase Console -> Storage -> Rules.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 1. Default-Deny Catch-All
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Identity & Role Helpers
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Flagged for clinic owner confirmation before production launch
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'dilseinvite@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        firestore.exists(/databases/(default)/documents/staff_roles/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/staff_roles/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isStaff() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        firestore.exists(/databases/(default)/documents/staff_roles/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/staff_roles/$(request.auth.uid)).data.role in ['admin', 'editor']
+      );
+    }
+
+    function isValidImageUpload(filename) {
+      return request.resource != null &&
+        request.resource.size > 0 &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'] &&
+        filename.size() >= 5 &&
+        filename.size() <= 140 &&
+        filename.matches('^[a-zA-Z0-9_\\-]+\\.(webp|jpg|jpeg|png)$') &&
+        request.resource.metadata != null &&
+        request.resource.metadata['uploadedByUid'] == request.auth.uid;
+    }
+
+    // 3. Public Editorial Assets (Treatments & Doctor Portrait)
+    // - No public directory listing (`list` restricted to staff)
+    // - Immutable creation only (`resource == null`, `allow update: if false`) to prevent overwriting existing clinic assets
+    match /n7_media/treatments/{filename} {
+      allow get: if true;
+      allow list: if isStaff();
+      allow create: if isStaff() && resource == null && isValidImageUpload(filename);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /n7_media/doctor/{filename} {
+      allow get: if true;
+      allow list: if isStaff();
+      allow create: if isStaff() && resource == null && isValidImageUpload(filename);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // 4. Private Clinical Photographs (Pending Publication Consent Verification)
+    // - Strictly private: never readable by unauthenticated or non-staff users
+    match /n7_media/clinical_results_private/{filename} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && resource == null && isValidImageUpload(filename);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // 5. Consented Clinical Photographs
+    // - Public `get` permitted ONLY when custom metadata explicitly confirms documented consent & publication approval
+    match /n7_media/clinical_results_consented/{filename} {
+      allow get: if (
+        resource.metadata != null &&
+        resource.metadata['consentVerified'] == 'true' &&
+        resource.metadata['published'] == 'true' &&
+        resource.metadata['consentReference'] != null &&
+        resource.metadata['consentReference'].size() >= 2
+      ) || isStaff();
+      allow list: if isStaff();
+      allow create: if isStaff() &&
+        resource == null &&
+        isValidImageUpload(filename) &&
+        request.resource.metadata['consentVerified'] == 'true' &&
+        request.resource.metadata['consentReference'] != null &&
+        request.resource.metadata['consentReference'].size() >= 2;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+  }
+}

@@ -13,7 +13,9 @@
         "email": {
           "type": "string",
           "format": "email",
-          "maxLength": 254
+          "minLength": 3,
+          "maxLength": 254,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
         },
         "role": {
           "type": "string",
@@ -39,11 +41,14 @@
         "phone": {
           "type": "string",
           "minLength": 7,
-          "maxLength": 30
+          "maxLength": 30,
+          "pattern": "^[0-9+()\\-\\s]{7,30}$"
         },
         "email": {
           "type": "string",
-          "maxLength": 254
+          "minLength": 3,
+          "maxLength": 254,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
         },
         "treatment": {
           "type": "string",
@@ -53,7 +58,8 @@
         "preferredDate": {
           "type": "string",
           "minLength": 8,
-          "maxLength": 20
+          "maxLength": 20,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
         },
         "message": {
           "type": "string",
@@ -68,6 +74,7 @@
         },
         "assignedTo": {
           "type": "string",
+          "minLength": 1,
           "maxLength": 120
         },
         "createdAt": {
