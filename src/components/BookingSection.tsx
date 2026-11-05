@@ -59,6 +59,7 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
   const [errors, setErrors] = useState<BookingFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSubmitTimestamp, setLastSubmitTimestamp] = useState<number>(0);
+  const lastSubmittedFingerprintRef = useRef<string>('');
   const [serverResponse, setServerResponse] = useState<{
     status: 'idle' | 'demo_mode' | 'live_enquiry_logged' | 'throttled' | 'error';
     title: string;
@@ -187,13 +188,7 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const now = Date.now();
-    if (now - lastSubmitTimestamp < 8000) {
-      setServerResponse({
-        status: 'throttled',
-        title: 'Please wait a moment before resubmitting',
-        message: 'To prevent duplicate submissions, please wait 8 seconds before trying again.',
-      });
+    if (isSubmitting) {
       return;
     }
 
@@ -215,61 +210,147 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
       return;
     }
 
+    const cleanedPhone = form.phone.replace(/[\s()-]/g, '');
+    const submissionFingerprint = [
+      settings.bookingLiveMode ? 'live' : 'demo',
+      form.name.trim().toLowerCase(),
+      cleanedPhone,
+      form.treatment.trim(),
+      form.preferredDate.trim(),
+    ].join('|');
+
+    if (
+      settings.bookingLiveMode &&
+      lastSubmittedFingerprintRef.current &&
+      lastSubmittedFingerprintRef.current === submissionFingerprint
+    ) {
+      setServerResponse({
+        status: 'throttled',
+        title: 'Enquiry Already Recorded',
+        message:
+          'This consultation enquiry has already been saved for coordinator review. Please update your details if you wish to submit a separate request.',
+      });
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastSubmitTimestamp < 8000) {
+      setServerResponse({
+        status: 'throttled',
+        title: 'Please wait a moment before resubmitting',
+        message: 'To prevent duplicate submissions, please wait 8 seconds before trying again.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setLastSubmitTimestamp(now);
 
+    const requestBody = {
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim() || undefined,
+      treatment: form.treatment,
+      preferredDate: form.preferredDate,
+      message: form.message.trim() || undefined,
+      privacyConsent: form.privacyConsent,
+      website_url: form.website_url,
+      liveMode: settings.bookingLiveMode,
+    };
+
     try {
-      // If admin enabled Live Booking Mode in /admin, record enquiry in CMS & notify backend
       if (settings.bookingLiveMode) {
-        await submitEnquiryToCms({
-          name: form.name,
-          phone: form.phone,
-          email: form.email || undefined,
-          treatment: form.treatment,
-          preferredDate: form.preferredDate,
-          message: form.message || undefined,
-          privacyConsent: form.privacyConsent,
-        });
-
-        await fetch(siteContent.bookingConfig.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name.trim(),
-            phone: form.phone.trim(),
-            email: form.email.trim() || undefined,
+        // Step 1: Save live enquiry to Firebase Firestore (source of truth).
+        // If Firestore save fails, never display a successful booking confirmation.
+        try {
+          await submitEnquiryToCms({
+            name: form.name,
+            phone: form.phone,
+            email: form.email || undefined,
             treatment: form.treatment,
             preferredDate: form.preferredDate,
-            message: form.message.trim() || undefined,
+            message: form.message || undefined,
             privacyConsent: form.privacyConsent,
-            website_url: form.website_url,
-            liveMode: true,
-          }),
-        }).catch(() => {});
+          });
+          lastSubmittedFingerprintRef.current = submissionFingerprint;
+        } catch {
+          setLastSubmitTimestamp(0);
+          setServerResponse({
+            status: 'error',
+            title: 'Unable to Save Consultation Enquiry',
+            message:
+              'Your consultation enquiry could not be saved to the clinic database at this time. No enquiry or appointment has been recorded. Please check your connection and try again.',
+          });
+          return;
+        }
 
-        setServerResponse({
-          status: 'live_enquiry_logged',
-          title: 'Enquiry Logged for Clinic Coordinator Review',
-          message:
-            'Your enquiry has been recorded in the /admin queue for coordinator review. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-        });
+        // Step 2: Trigger optional server-side notification via /api/appointments and check result.
+        try {
+          const response = await fetch(siteContent.bookingConfig.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          });
+          const data = await response.json().catch(() => null);
+
+          if (response.ok && data?.ok && data?.notificationStatus === 'sent') {
+            setServerResponse({
+              status: 'live_enquiry_logged',
+              title: 'Enquiry Saved for Clinic Coordinator Review',
+              message:
+                'Your consultation enquiry has been saved in the /admin queue and staff notification was dispatched. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+            });
+          } else if (
+            response.ok &&
+            data?.ok &&
+            data?.notificationStatus === 'configuration_pending'
+          ) {
+            setServerResponse({
+              status: 'live_enquiry_logged',
+              title: 'Enquiry Saved for Clinic Coordinator Review',
+              message:
+                'Your consultation enquiry has been saved in the /admin queue for coordinator review (optional automated staff webhook notification is not yet configured). Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+            });
+          } else {
+            setServerResponse({
+              status: 'live_enquiry_logged',
+              title: 'Enquiry Saved — Automated Staff Notification Pending',
+              message:
+                'Your consultation enquiry was saved in the /admin queue for coordinator review, but automated staff webhook notification could not be completed. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+            });
+          }
+        } catch {
+          setServerResponse({
+            status: 'live_enquiry_logged',
+            title: 'Enquiry Saved — Automated Staff Notification Pending',
+            message:
+              'Your consultation enquiry was saved in the /admin queue for coordinator review, but the optional staff notification service was unreachable. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+          });
+        }
       } else {
-        // Non-functional clearly labelled Demo Mode
-        await fetch(siteContent.bookingConfig.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name.trim(),
-            phone: form.phone.trim(),
-            email: form.email.trim() || undefined,
-            treatment: form.treatment,
-            preferredDate: form.preferredDate,
-            message: form.message.trim() || undefined,
-            privacyConsent: form.privacyConsent,
-            website_url: form.website_url,
-            liveMode: false,
-          }),
-        }).catch(() => {});
+        // Clearly labelled non-deceptive Demo Mode
+        try {
+          const response = await fetch(siteContent.bookingConfig.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          });
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok || (data && data.ok === false)) {
+            setLastSubmitTimestamp(0);
+            setServerResponse({
+              status: 'error',
+              title: 'Consultation Request Validation Error',
+              message:
+                data?.message ||
+                'Please check your consultation form details and try again. No appointment has been booked.',
+            });
+            return;
+          }
+        } catch {
+          // Even if the local/serverless endpoint is offline in Demo Mode, keep Demo Mode clearly labelled
+        }
 
         setServerResponse({
           status: 'demo_mode',
@@ -277,12 +358,6 @@ export function BookingSection({ compact = false, preselectedTreatment = '' }: B
           message: siteContent.bookingConfig.demoNoticeBody,
         });
       }
-    } catch {
-      setServerResponse({
-        status: 'demo_mode',
-        title: siteContent.bookingConfig.demoNoticeTitle,
-        message: siteContent.bookingConfig.demoNoticeBody,
-      });
     } finally {
       setIsSubmitting(false);
     }
