@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img" aria-labelledby="rhTitle">
+  <title id="rhTitle">Rhinoplasty — Illustrative Concept</title>
+  <defs>
+    <linearGradient id="bgRh" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7B614E"/>
+      <stop offset="55%" stop-color="#4A382D"/>
+      <stop offset="100%" stop-color="#211A17"/>
+    </linearGradient>
+    <linearGradient id="profileSkin" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#F3DFCC"/>
+      <stop offset="55%" stop-color="#CFA787"/>
+      <stop offset="100%" stop-color="#7E5940"/>
+    </linearGradient>
+    <linearGradient id="scrimRh" x1="0" y1="0.45" x2="0" y2="1">
+      <stop offset="0%" stop-color="#211A17" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#211A17" stop-opacity="0.92"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="720" fill="url(#bgRh)"/>
+  <!-- Graceful upturned profile silhouette -->
+  <path d="M520 120
+           C435 125, 375 160, 345 210
+           C335 228, 255 255, 228 272
+           C208 285, 224 308, 245 318
+           C232 338, 222 350, 234 368
+           C220 382, 225 405, 242 415
+           C222 442, 232 478, 275 492
+           C345 512, 395 495, 425 565
+           L410 720 L600 720 L600 120 Z"
+        fill="url(#profileSkin)"/>
+  <!-- Sleek dark hair contour -->
+  <path d="M425 132 C485 110, 565 130, 600 190 L600 450 C550 385, 515 265, 425 132 Z" fill="#1E1511"/>
+  <!-- Closed serene eyelashes & brow in profile -->
+  <path d="M335 232 Q368 212 408 228" fill="none" stroke="#241914" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M328 268 Q352 276 374 265" fill="none" stroke="#211713" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Subtle dorsal aesthetic line -->
+  <path d="M332 212 L222 270 L248 315" fill="none" stroke="#F5EEE8" stroke-width="1.4" stroke-dasharray="4 4" opacity="0.65"/>
+  <rect width="600" height="720" fill="url(#scrimRh)"/>
+</svg>

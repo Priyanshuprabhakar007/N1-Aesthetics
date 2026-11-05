@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1100" viewBox="0 0 900 1100" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">Illustrative Aesthetic Beauty Portrait Placeholder</title>
+  <desc id="heroDesc">Warm editorial portrait composition in chocolate, espresso, and champagne tones representing facial harmony and aesthetic refinement.</desc>
+  <defs>
+    <radialGradient id="bgGlow" cx="55%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#8A684D" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#4A372D" stop-opacity="0.78"/>
+      <stop offset="100%" stop-color="#211A17" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="skinLight" x1="25%" y1="15%" x2="75%" y2="85%">
+      <stop offset="0%" stop-color="#F2DEC9"/>
+      <stop offset="42%" stop-color="#D7B293"/>
+      <stop offset="78%" stop-color="#9E7456"/>
+      <stop offset="100%" stop-color="#5B3F2E"/>
+    </linearGradient>
+    <linearGradient id="skinShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C69C7B" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#473226" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="hairTone" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#3A2920"/>
+      <stop offset="45%" stop-color="#221813"/>
+      <stop offset="100%" stop-color="#140E0B"/>
+    </linearGradient>
+    <radialGradient id="cheekHighlight" cx="48%" cy="48%" r="35%">
+      <stop offset="0%" stop-color="#FCEEE2" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#E6CDB5" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bottomFade" x1="0%" y1="65%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#211A17" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#211A17" stop-opacity="0.95"/>
+    </linearGradient>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+    <filter id="subtleBlur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <!-- Studio backdrop -->
+  <rect width="900" height="1100" fill="url(#bgGlow)"/>
+  <ellipse cx="520" cy="440" rx="290" ry="360" fill="#C8A282" opacity="0.16" filter="url(#softBlur)"/>
+  <ellipse cx="640" cy="680" rx="220" ry="260" fill="#18120F" opacity="0.65" filter="url(#softBlur)"/>
+
+  <!-- Sleek swept-back hair silhouette & low bun -->
+  <path d="M365 215 C425 130, 585 135, 650 245 C705 335, 695 495, 650 585 C685 595, 712 635, 695 685 C678 730, 625 740, 595 705 C540 640, 410 490, 365 215 Z" fill="url(#hairTone)"/>
+
+  <!-- Neck & gracefully turned shoulder -->
+  <path d="M445 660 C455 755, 435 845, 365 925 L745 985 C725 885, 655 825, 595 765 C575 710, 580 645, 585 600 Z" fill="url(#skinLight)"/>
+  <path d="M465 675 C495 735, 540 775, 595 765 C578 705, 580 645, 582 605 Z" fill="url(#skinShadow)" opacity="0.55"/>
+
+  <!-- Delicate gold necklace chain hint -->
+  <path d="M452 835 Q545 865 638 898" fill="none" stroke="#E6CDB5" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.7"/>
+
+  <!-- Three-quarter sculptural face silhouette -->
+  <path d="M375 255
+           C355 305, 348 355, 355 395
+           C358 415, 332 465, 326 492
+           C321 512, 342 522, 356 526
+           C350 545, 344 558, 354 572
+           C345 584, 348 602, 362 612
+           C366 645, 378 672, 415 682
+           C468 695, 548 655, 595 585
+           C635 525, 645 425, 615 325
+           C585 225, 435 190, 375 255 Z"
+        fill="url(#skinLight)"/>
+
+  <!-- Soft cheekbone & nasal bridge studio highlight -->
+  <ellipse cx="475" cy="495" rx="95" ry="75" fill="url(#cheekHighlight)" filter="url(#subtleBlur)"/>
+  <path d="M358 405 L335 495 L368 518" fill="none" stroke="#FCEEE2" stroke-width="3" stroke-linecap="round" opacity="0.55" filter="url(#subtleBlur)"/>
+
+  <!-- Sculpted jawline & temple shadow -->
+  <path d="M515 240 C585 280, 618 395, 595 515 C575 605, 505 665, 425 680 C495 685, 568 638, 605 568 C642 498, 645 375, 608 295 Z" fill="url(#skinShadow)" opacity="0.65"/>
+
+  <!-- Ear & subtle pearl/gold stud -->
+  <path d="M602 465 C628 458, 642 488, 632 528 C622 558, 598 568, 588 548" fill="url(#skinLight)" stroke="#8B6347" stroke-width="1.2"/>
+  <circle cx="604" cy="552" r="3.5" fill="#E6CDB5"/>
+
+  <!-- Expressive arched eyebrows -->
+  <path d="M342 385 Q362 372 385 382" fill="none" stroke="#2A1D17" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M425 378 Q478 358 538 384" fill="none" stroke="#2A1D17" stroke-width="6.5" stroke-linecap="round"/>
+
+  <!-- Eyes with warm hazel-espresso irises -->
+  <g>
+    <!-- Far eye -->
+    <path d="M348 418 Q366 406 384 418 Q366 426 348 418 Z" fill="#F7EDE4"/>
+    <circle cx="366" cy="417" r="6.5" fill="#4A3425"/>
+    <circle cx="366" cy="417" r="3" fill="#18120F"/>
+    <circle cx="364" cy="415" r="1.5" fill="#FFFDFB"/>
+    <path d="M345 416 Q366 403 386 417" fill="none" stroke="#1E1410" stroke-width="2.6" stroke-linecap="round"/>
+
+    <!-- Near eye -->
+    <path d="M438 416 Q472 400 508 418 Q472 430 438 416 Z" fill="#F7EDE4"/>
+    <circle cx="470" cy="415" r="9" fill="#523A28"/>
+    <circle cx="470" cy="415" r="4.2" fill="#18120F"/>
+    <circle cx="467" cy="412" r="2" fill="#FFFDFB"/>
+    <path d="M434 415 Q472 397 514 417" fill="none" stroke="#1E1410" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M442 422 Q472 432 504 421" fill="none" stroke="#7A563E" stroke-width="1.2" opacity="0.7"/>
+  </g>
+
+  <!-- Refined nasal contour -->
+  <path d="M385 395 C372 432, 344 472, 336 494 C332 506, 348 516, 376 516 C388 516, 398 511, 404 505" fill="none" stroke="#78523B" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="366" cy="511" rx="7" ry="3.2" fill="#5A3B29" opacity="0.65"/>
+
+  <!-- Full natural lips in warm rose-terracotta -->
+  <path d="M350 568 Q362 556 374 562 Q386 555 416 569 Q384 574 350 568 Z" fill="#B56E5B"/>
+  <path d="M350 569 Q382 575 416 569 Q392 598 362 592 Q348 586 350 569 Z" fill="#C97F6B"/>
+  <path d="M350 569 Q382 574 415 569" fill="none" stroke="#6E3B2E" stroke-width="1.6" stroke-linecap="round"/>
+  <ellipse cx="376" cy="582" rx="14" ry="4" fill="#F7D8CE" opacity="0.38"/>
+
+  <!-- Hairline wisps -->
+  <path d="M375 255 C415 205, 515 215, 575 285 C615 335, 622 410, 610 460" fill="none" stroke="#221813" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
+  <path d="M405 235 C465 215, 545 245, 595 335" fill="none" stroke="#6E523E" stroke-width="1.5" opacity="0.45"/>
+
+  <!-- Aesthetic proportional guide lines (subtle editorial touch) -->
+  <g opacity="0.22" stroke="#E6CDB5" stroke-width="0.75" stroke-dasharray="4 4">
+    <line x1="290" y1="496" x2="430" y2="496"/>
+    <line x1="336" y1="440" x2="336" y2="550"/>
+  </g>
+
+  <rect width="900" height="1100" fill="url(#bottomFade)"/>
+</svg>

@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+:root {
+  --n7-chocolate: #30251F;
+  --n7-espresso: #211A17;
+  --n7-champagne: #E6CDB5;
+  --n7-ivory: #F5EEE8;
+  --n7-gold: #BA9876;
+  --n7-heading-font: "Cormorant Garamond", Georgia, serif;
+  --n7-secondary-font: "Playfair Display", Georgia, serif;
+  --n7-body-font: "Inter", Arial, sans-serif;
+  --n7-max-width: 1440px;
+  --n7-gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --n7-radius-card: 18px;
+}
+
+@theme {
+  --color-chocolate: #30251F;
+  --color-espresso: #211A17;
+  --color-champagne: #E6CDB5;
+  --color-ivory: #F5EEE8;
+  --color-gold: #BA9876;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-serif-secondary: "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  /*
+   * SINGLE VERTICAL SCROLLING CONTEXT:
+   * - html owns vertical scrolling (overflow-y: auto).
+   * - overflow-x: clip prevents horizontal overflow WITHOUT creating a secondary scroll container
+   *   (unlike overflow-x: hidden, which forces overflow-y: auto per CSS Overflow spec).
+   */
+  html {
+    font-family: var(--n7-body-font);
+    background-color: var(--n7-ivory);
+    color: var(--n7-espresso);
+    height: auto;
+    min-height: 100%;
+    overflow-x: clip;
+    overflow-y: auto;
+    scroll-padding-top: 88px;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    overflow-x: clip;
+    overflow-y: visible;
+    background-color: var(--n7-ivory);
+    color: var(--n7-espresso);
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  h1, h2, .font-heading {
+    font-family: var(--n7-heading-font);
+  }
+
+  h3, .font-secondary-heading {
+    font-family: var(--n7-secondary-font);
+  }
+}
+
+/* Masked text wrapper for editorial vertical text reveals */
+.editorial-mask-line {
+  display: block;
+  overflow: hidden;
+}
+
+/* Smooth left-to-right editorial underline for navigation & footer links */
+.editorial-nav-link,
+.editorial-footer-link {
+  position: relative;
+}
+
+.editorial-nav-link::after,
+.editorial-footer-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background-color: #E6CDB5;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.editorial-nav-link:hover::after,
+.editorial-nav-link:focus-visible::after,
+.editorial-nav-link[data-active="true"]::after,
+.editorial-footer-link:hover::after,
+.editorial-footer-link:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+/* Delicate dark underline for light-surface section links (e.g., View All Treatments) */
+.editorial-dark-link {
+  position: relative;
+}
+
+.editorial-dark-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background-color: #211A17;
+  transform: scaleX(0.28);
+  transform-origin: left center;
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+.editorial-dark-link:hover::after,
+.editorial-dark-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* Restrained tactile button lift & active press */
+.editorial-btn-lift {
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.editorial-btn-lift:hover {
+  transform: translateY(-2px);
+}
+
+.editorial-btn-lift:active {
+  transform: translateY(0px) scale(0.992);
+}
+
+/* Signature treatment card hover: image scales to 1.045 over 0.6s, circular arrow shifts diagonally by 3px */
+.treatment-card-image {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.group:hover .treatment-card-image,
+.group:focus-visible .treatment-card-image {
+  transform: scale(1.045);
+}
+
+.treatment-card-arrow {
+  transition:
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.group:hover .treatment-card-arrow,
+.group:focus-visible .treatment-card-arrow {
+  transform: translate(3px, -3px);
+}
+
+/* Booking form input border transitions between warm gray and champagne */
+.editorial-input {
+  border-color: rgba(48, 37, 31, 0.2);
+  transition:
+    border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.editorial-input:hover {
+  border-color: rgba(186, 152, 118, 0.65);
+}
+
+.editorial-input:focus {
+  outline: none;
+  border-color: #BA9876;
+  box-shadow: 0 0 0 3px rgba(230, 205, 181, 0.45);
+  background-color: #FFFFFF;
+}
+
+/* Hide scrollbar on horizontal mobile carousels without affecting vertical page scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .editorial-btn-lift:hover,
+  .editorial-btn-lift:active,
+  .group:hover .treatment-card-image,
+  .group:hover .treatment-card-arrow {
+    transform: none !important;
+  }
+}

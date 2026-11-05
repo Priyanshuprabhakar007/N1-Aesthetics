@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img" aria-labelledby="htTitle">
+  <title id="htTitle">Hair Transplant — Illustrative Concept</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A372D"/>
+      <stop offset="55%" stop-color="#30251F"/>
+      <stop offset="100%" stop-color="#191310"/>
+    </linearGradient>
+    <radialGradient id="skin" cx="50%" cy="62%" r="48%">
+      <stop offset="0%" stop-color="#E5C3A6"/>
+      <stop offset="65%" stop-color="#B58969"/>
+      <stop offset="100%" stop-color="#6B4C38"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="720" fill="url(#bg)"/>
+  <!-- Forehead & natural hairline silhouette -->
+  <path d="M125 680 C120 450, 155 245, 300 235 C445 245, 480 450, 475 680 Z" fill="url(#skin)"/>
+  <!-- Dense, natural hairline design -->
+  <path d="M125 445 C120 245, 185 115, 300 110 C415 115, 480 245, 475 445 C445 360, 405 325, 365 340 C335 352, 315 368, 300 370 C285 368, 265 352, 235 340 C195 325, 155 360, 125 445 Z" fill="#1D1512"/>
+  <!-- Fine hairline design guide arc -->
+  <path d="M160 372 Q230 335 300 370 Q370 335 440 372" fill="none" stroke="#E6CDB5" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.65"/>
+  <!-- Eyebrow hints -->
+  <path d="M180 545 Q225 525 268 542" fill="none" stroke="#231915" stroke-width="9" stroke-linecap="round"/>
+  <path d="M332 542 Q375 525 420 545" fill="none" stroke="#231915" stroke-width="9" stroke-linecap="round"/>
+  <!-- Bottom gradient scrim -->
+  <linearGradient id="scrim" x1="0" y1="0.45" x2="0" y2="1">
+    <stop offset="0%" stop-color="#211A17" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#211A17" stop-opacity="0.92"/>
+  </linearGradient>
+  <rect width="600" height="720" fill="url(#scrim)"/>
+</svg>

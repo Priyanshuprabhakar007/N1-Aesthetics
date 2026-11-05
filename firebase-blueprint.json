@@ -1,0 +1,430 @@
+{
+  "entities": {
+    "StaffRole": {
+      "title": "StaffRole",
+      "description": "Role assignment document for admin and editor staff members.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "editor"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "AppointmentEnquiry": {
+      "title": "AppointmentEnquiry",
+      "description": "Consultation request submitted by a prospective patient (no medical history stored).",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 30
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "treatment": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "preferredDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "privacyConsent": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["new", "contacted", "scheduled", "archived"]
+        },
+        "assignedTo": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "phone",
+        "treatment",
+        "preferredDate",
+        "privacyConsent",
+        "status",
+        "assignedTo",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TreatmentDoc": {
+      "title": "TreatmentDoc",
+      "description": "Editable clinic treatment record with draft or clinic-approved status.",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "shortTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "overview": {
+          "type": "string",
+          "maxLength": 2500
+        },
+        "cardImage": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "approvalStatus": {
+          "type": "string",
+          "enum": ["draft_pending_clinic_approval", "approved_by_clinic"]
+        },
+        "isSignature": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "shortTitle",
+        "category",
+        "summary",
+        "overview",
+        "cardImage",
+        "approvalStatus",
+        "isSignature",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "ConsentedTestimonialDoc": {
+      "title": "ConsentedTestimonialDoc",
+      "description": "Authenticated patient testimonial with documented consent verification.",
+      "type": "object",
+      "properties": {
+        "patientIdentifier": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "procedureContext": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1200
+        },
+        "consentVerified": {
+          "type": "boolean"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "patientIdentifier",
+        "procedureContext",
+        "quote",
+        "consentVerified",
+        "published",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "ConsentedResultDoc": {
+      "title": "ConsentedResultDoc",
+      "description": "Consented, unaltered clinical before/after case record.",
+      "type": "object",
+      "properties": {
+        "treatmentSlug": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "treatmentTitle": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "beforeImage": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "afterImage": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "clinicalNotes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "consentReference": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "consentVerified": {
+          "type": "boolean"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "treatmentSlug",
+        "treatmentTitle",
+        "beforeImage",
+        "afterImage",
+        "clinicalNotes",
+        "consentReference",
+        "consentVerified",
+        "published",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "BlogArticleDoc": {
+      "title": "BlogArticleDoc",
+      "description": "Clinical resource and educational blog article with SEO metadata.",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 180
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "excerpt": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "readingTime": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "seoTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "seoDescription": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "category",
+        "excerpt",
+        "readingTime",
+        "seoTitle",
+        "seoDescription",
+        "published",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "SiteSettingsDoc": {
+      "title": "SiteSettingsDoc",
+      "description": "Global CMS configuration for doctor profile, clinic contact, and SEO.",
+      "type": "object",
+      "properties": {
+        "doctorName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "doctorRole": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "doctorShortIntro": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "doctorPortraitUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "credentialsVerified": {
+          "type": "boolean"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "whatsappNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "isPhoneConfirmed": {
+          "type": "boolean"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "hours": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "bookingLiveMode": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "doctorName",
+        "doctorRole",
+        "doctorShortIntro",
+        "doctorPortraitUrl",
+        "credentialsVerified",
+        "phone",
+        "whatsappNumber",
+        "isPhoneConfirmed",
+        "email",
+        "address",
+        "hours",
+        "bookingLiveMode",
+        "authorUid",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/staff_roles/{userId}": {
+      "schema": { "$ref": "#/entities/StaffRole" },
+      "description": "Role-based access control records for admin and editor staff."
+    },
+    "/appointment_enquiries/{enquiryId}": {
+      "schema": { "$ref": "#/entities/AppointmentEnquiry" },
+      "description": "Patient consultation requests containing PII, readable only by verified staff."
+    },
+    "/treatments/{treatmentId}": {
+      "schema": { "$ref": "#/entities/TreatmentDoc" },
+      "description": "Clinic treatments and procedures managed by admin/editor roles."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": { "$ref": "#/entities/ConsentedTestimonialDoc" },
+      "description": "Consented patient testimonials."
+    },
+    "/clinical_results/{resultId}": {
+      "schema": { "$ref": "#/entities/ConsentedResultDoc" },
+      "description": "Consented clinical before/after photo cases."
+    },
+    "/blog_posts/{postId}": {
+      "schema": { "$ref": "#/entities/BlogArticleDoc" },
+      "description": "Educational articles and SEO settings."
+    },
+    "/site_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettingsDoc" },
+      "description": "Global clinic profile, doctor bio, and contact confirmation toggles."
+    }
+  }
+}

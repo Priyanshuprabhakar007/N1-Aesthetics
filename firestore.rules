@@ -1,0 +1,242 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'dilseinvite@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/staff_roles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/staff_roles/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isStaff() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/staff_roles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/staff_roles/$(request.auth.uid)).data.role in ['admin', 'editor']
+      );
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidStaffRole(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.role is string && data.role in ['admin', 'editor'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAppointmentEnquiry(data) {
+      return data.keys().hasAll(['name', 'phone', 'treatment', 'preferredDate', 'privacyConsent', 'status', 'assignedTo', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'phone', 'email', 'treatment', 'preferredDate', 'message', 'privacyConsent', 'status', 'assignedTo', 'createdAt', 'updatedAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.phone is string && data.phone.size() >= 7 && data.phone.size() <= 30 &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 254)) &&
+        data.treatment is string && data.treatment.size() >= 2 && data.treatment.size() <= 120 &&
+        data.preferredDate is string && data.preferredDate.size() >= 8 && data.preferredDate.size() <= 20 &&
+        (!('message' in data) || (data.message is string && data.message.size() <= 500)) &&
+        data.privacyConsent is bool && data.privacyConsent == true &&
+        data.status is string && data.status in ['new', 'contacted', 'scheduled', 'archived'] &&
+        data.assignedTo is string && data.assignedTo.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTreatmentDoc(data) {
+      return data.keys().hasAll(['slug', 'title', 'shortTitle', 'category', 'summary', 'overview', 'cardImage', 'approvalStatus', 'isSignature', 'authorUid', 'updatedAt']) &&
+        data.keys().hasOnly(['slug', 'title', 'shortTitle', 'category', 'summary', 'overview', 'cardImage', 'approvalStatus', 'isSignature', 'authorUid', 'updatedAt']) &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 100 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
+        data.shortTitle is string && data.shortTitle.size() >= 2 && data.shortTitle.size() <= 80 &&
+        data.category is string && data.category.size() >= 2 && data.category.size() <= 80 &&
+        data.summary is string && data.summary.size() >= 2 && data.summary.size() <= 600 &&
+        data.overview is string && data.overview.size() >= 2 && data.overview.size() <= 2500 &&
+        data.cardImage is string && data.cardImage.size() >= 1 && data.cardImage.size() <= 1000 &&
+        data.approvalStatus is string && data.approvalStatus in ['draft_pending_clinic_approval', 'approved_by_clinic'] &&
+        data.isSignature is bool &&
+        data.authorUid is string && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTestimonialDoc(data) {
+      return data.keys().hasAll(['patientIdentifier', 'procedureContext', 'quote', 'consentVerified', 'published', 'authorUid', 'updatedAt']) &&
+        data.keys().hasOnly(['patientIdentifier', 'procedureContext', 'quote', 'consentVerified', 'published', 'authorUid', 'updatedAt']) &&
+        data.patientIdentifier is string && data.patientIdentifier.size() >= 2 && data.patientIdentifier.size() <= 100 &&
+        data.procedureContext is string && data.procedureContext.size() <= 120 &&
+        data.quote is string && data.quote.size() >= 10 && data.quote.size() <= 1200 &&
+        data.consentVerified is bool &&
+        data.published is bool &&
+        (!data.published || data.consentVerified == true) &&
+        data.authorUid is string && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidClinicalResultDoc(data) {
+      return data.keys().hasAll(['treatmentSlug', 'treatmentTitle', 'beforeImage', 'afterImage', 'clinicalNotes', 'consentReference', 'consentVerified', 'published', 'authorUid', 'updatedAt']) &&
+        data.keys().hasOnly(['treatmentSlug', 'treatmentTitle', 'beforeImage', 'afterImage', 'clinicalNotes', 'consentReference', 'consentVerified', 'published', 'authorUid', 'updatedAt']) &&
+        data.treatmentSlug is string && data.treatmentSlug.size() >= 2 && data.treatmentSlug.size() <= 100 &&
+        data.treatmentTitle is string && data.treatmentTitle.size() >= 2 && data.treatmentTitle.size() <= 140 &&
+        data.beforeImage is string && data.beforeImage.size() >= 1 && data.beforeImage.size() <= 1000 &&
+        data.afterImage is string && data.afterImage.size() >= 1 && data.afterImage.size() <= 1000 &&
+        data.clinicalNotes is string && data.clinicalNotes.size() <= 1000 &&
+        data.consentReference is string && data.consentReference.size() >= 2 && data.consentReference.size() <= 160 &&
+        data.consentVerified is bool &&
+        data.published is bool &&
+        (!data.published || data.consentVerified == true) &&
+        data.authorUid is string && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBlogArticleDoc(data) {
+      return data.keys().hasAll(['slug', 'title', 'category', 'excerpt', 'readingTime', 'seoTitle', 'seoDescription', 'published', 'authorUid', 'updatedAt']) &&
+        data.keys().hasOnly(['slug', 'title', 'category', 'excerpt', 'readingTime', 'seoTitle', 'seoDescription', 'published', 'authorUid', 'updatedAt']) &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 120 &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 180 &&
+        data.category is string && data.category.size() <= 80 &&
+        data.excerpt is string && data.excerpt.size() <= 600 &&
+        data.readingTime is string && data.readingTime.size() <= 40 &&
+        data.seoTitle is string && data.seoTitle.size() <= 120 &&
+        data.seoDescription is string && data.seoDescription.size() <= 240 &&
+        data.published is bool &&
+        data.authorUid is string && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSiteSettingsDoc(data) {
+      return data.keys().hasAll(['doctorName', 'doctorRole', 'doctorShortIntro', 'doctorPortraitUrl', 'credentialsVerified', 'phone', 'whatsappNumber', 'isPhoneConfirmed', 'email', 'address', 'hours', 'bookingLiveMode', 'authorUid', 'updatedAt']) &&
+        data.keys().hasOnly(['doctorName', 'doctorRole', 'doctorShortIntro', 'doctorPortraitUrl', 'credentialsVerified', 'phone', 'whatsappNumber', 'isPhoneConfirmed', 'email', 'address', 'hours', 'bookingLiveMode', 'authorUid', 'updatedAt']) &&
+        data.doctorName is string && data.doctorName.size() >= 2 && data.doctorName.size() <= 120 &&
+        data.doctorRole is string && data.doctorRole.size() <= 160 &&
+        data.doctorShortIntro is string && data.doctorShortIntro.size() <= 800 &&
+        data.doctorPortraitUrl is string && data.doctorPortraitUrl.size() <= 1000 &&
+        data.credentialsVerified is bool &&
+        data.phone is string && data.phone.size() <= 60 &&
+        data.whatsappNumber is string && data.whatsappNumber.size() <= 40 &&
+        data.isPhoneConfirmed is bool &&
+        data.email is string && data.email.size() <= 160 &&
+        data.address is string && data.address.size() <= 300 &&
+        data.hours is string && data.hours.size() <= 160 &&
+        data.bookingLiveMode is bool &&
+        data.authorUid is string && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules
+
+    // RBAC Staff Roles — PII & Role Isolation
+    match /staff_roles/{userId} {
+      allow get: if isValidId(userId) && (isAdmin() || (isSignedIn() && request.auth.uid == userId));
+      allow list: if isAdmin() && resource.data.role in ['admin', 'editor'];
+      allow create: if isValidId(userId) && isValidStaffRole(incoming()) && isAdmin() && incoming().uid == userId && incoming().createdAt == request.time;
+      allow update: if isValidId(userId) && isValidStaffRole(incoming()) && isAdmin() &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['role', 'email']);
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Appointment Enquiries — Strict PII Isolation (only staff can read/list)
+    match /appointment_enquiries/{enquiryId} {
+      allow get: if isValidId(enquiryId) && isStaff();
+      allow list: if isStaff() && resource.data.status in ['new', 'contacted', 'scheduled', 'archived'];
+      allow create: if isValidId(enquiryId) &&
+        isValidAppointmentEnquiry(incoming()) &&
+        incoming().status == 'new' &&
+        incoming().assignedTo == 'unassigned' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(enquiryId) &&
+        isValidAppointmentEnquiry(incoming()) &&
+        isStaff() &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().name == existing().name &&
+        incoming().phone == existing().phone &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTo', 'updatedAt']);
+      allow delete: if isValidId(enquiryId) && isAdmin();
+    }
+
+    // Treatments Catalog
+    match /treatments/{treatmentId} {
+      allow get: if isValidId(treatmentId) && (resource.data.approvalStatus in ['draft_pending_clinic_approval', 'approved_by_clinic'] || isStaff());
+      allow list: if resource.data.approvalStatus in ['draft_pending_clinic_approval', 'approved_by_clinic'] || isStaff();
+      allow create: if isValidId(treatmentId) && isSignedIn() && isValidTreatmentDoc(incoming()) && isStaff() && incoming().updatedAt == request.time;
+      allow update: if isValidId(treatmentId) && isSignedIn() && isValidTreatmentDoc(incoming()) && isStaff() &&
+        incoming().slug == existing().slug &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'shortTitle', 'category', 'summary', 'overview', 'cardImage', 'approvalStatus', 'isSignature', 'authorUid', 'updatedAt']);
+      allow delete: if isValidId(treatmentId) && isAdmin();
+    }
+
+    // Consented Testimonials — Only published & consentVerified visible publicly
+    match /testimonials/{testimonialId} {
+      allow get: if isValidId(testimonialId) && ((resource.data.published == true && resource.data.consentVerified == true) || isStaff());
+      allow list: if (resource.data.published == true && resource.data.consentVerified == true) || isStaff();
+      allow create: if isValidId(testimonialId) && isSignedIn() && isValidTestimonialDoc(incoming()) && isStaff() && incoming().updatedAt == request.time;
+      allow update: if isValidId(testimonialId) && isSignedIn() && isValidTestimonialDoc(incoming()) && isStaff() &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['patientIdentifier', 'procedureContext', 'quote', 'consentVerified', 'published', 'authorUid', 'updatedAt']);
+      allow delete: if isValidId(testimonialId) && isAdmin();
+    }
+
+    // Consented Clinical Results — Only published & consentVerified visible publicly
+    match /clinical_results/{resultId} {
+      allow get: if isValidId(resultId) && ((resource.data.published == true && resource.data.consentVerified == true) || isStaff());
+      allow list: if (resource.data.published == true && resource.data.consentVerified == true) || isStaff();
+      allow create: if isValidId(resultId) && isSignedIn() && isValidClinicalResultDoc(incoming()) && isStaff() && incoming().updatedAt == request.time;
+      allow update: if isValidId(resultId) && isSignedIn() && isValidClinicalResultDoc(incoming()) && isStaff() &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['treatmentSlug', 'treatmentTitle', 'beforeImage', 'afterImage', 'clinicalNotes', 'consentReference', 'consentVerified', 'published', 'authorUid', 'updatedAt']);
+      allow delete: if isValidId(resultId) && isAdmin();
+    }
+
+    // Blog Articles & SEO
+    match /blog_posts/{postId} {
+      allow get: if isValidId(postId) && (resource.data.published == true || isStaff());
+      allow list: if resource.data.published == true || isStaff();
+      allow create: if isValidId(postId) && isSignedIn() && isValidBlogArticleDoc(incoming()) && isStaff() && incoming().updatedAt == request.time;
+      allow update: if isValidId(postId) && isSignedIn() && isValidBlogArticleDoc(incoming()) && isStaff() &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['slug', 'title', 'category', 'excerpt', 'readingTime', 'seoTitle', 'seoDescription', 'published', 'authorUid', 'updatedAt']);
+      allow delete: if isValidId(postId) && isAdmin();
+    }
+
+    // Global Site Settings & Doctor Profile
+    match /site_settings/{settingId} {
+      allow get: if isValidId(settingId) && (settingId == 'main' || isStaff());
+      allow list: if isStaff() && resource.data.doctorName is string;
+      allow create: if isValidId(settingId) && isSignedIn() && isValidSiteSettingsDoc(incoming()) && isStaff() && incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId) && isSignedIn() && isValidSiteSettingsDoc(incoming()) && isStaff() &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['doctorName', 'doctorRole', 'doctorShortIntro', 'doctorPortraitUrl', 'credentialsVerified', 'phone', 'whatsappNumber', 'isPhoneConfirmed', 'email', 'address', 'hours', 'bookingLiveMode', 'authorUid', 'updatedAt']);
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+  }
+}

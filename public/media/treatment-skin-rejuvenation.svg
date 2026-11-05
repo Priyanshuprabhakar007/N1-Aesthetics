@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img" aria-labelledby="srTitle">
+  <title id="srTitle">Skin Rejuvenation — Illustrative Concept</title>
+  <defs>
+    <linearGradient id="bgSr" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#856853"/>
+      <stop offset="55%" stop-color="#4B382C"/>
+      <stop offset="100%" stop-color="#211A17"/>
+    </linearGradient>
+    <radialGradient id="skinGlow" cx="48%" cy="45%" r="48%">
+      <stop offset="0%" stop-color="#F8E7D7"/>
+      <stop offset="55%" stop-color="#D4AE8E"/>
+      <stop offset="100%" stop-color="#835E44"/>
+    </radialGradient>
+    <linearGradient id="scrimSr" x1="0" y1="0.45" x2="0" y2="1">
+      <stop offset="0%" stop-color="#211A17" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#211A17" stop-opacity="0.92"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="720" fill="url(#bgSr)"/>
+  <!-- Close-up luminous cheek, temple and jawline curve -->
+  <path d="M140 120 C125 280, 155 465, 295 565 C415 505, 470 345, 455 120 Z" fill="url(#skinGlow)"/>
+  <!-- Botanical & dermal radiance rings -->
+  <circle cx="305" cy="345" r="88" fill="none" stroke="#E6CDB5" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.6"/>
+  <circle cx="305" cy="345" r="54" fill="none" stroke="#F5EEE8" stroke-width="1" opacity="0.45"/>
+  <!-- Serene lips & jawline hint -->
+  <path d="M245 458 Q300 442 355 458 Q300 486 245 458 Z" fill="#C27B67" opacity="0.85"/>
+  <rect width="600" height="720" fill="url(#scrimSr)"/>
+</svg>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://n7aesthetics.example/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://n7aesthetics.example/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://n7aesthetics.example/doctor</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/hair-transplant</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/rhinoplasty</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/gynecomastia-correction</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/body-contouring</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/skin-rejuvenation</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://n7aesthetics.example/treatments/reconstructive-consultation</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://n7aesthetics.example/results</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://n7aesthetics.example/testimonials</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://n7aesthetics.example/blog</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://n7aesthetics.example/contact</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+</urlset>
