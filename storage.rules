@@ -2,6 +2,12 @@ rules_version = '2';
 
 // PROPOSED FIREBASE STORAGE SECURITY RULES FOR N7 AESTHETICS
 // Status: Proposed in repository — requires manual deployment in Firebase Console -> Storage -> Rules.
+// Note on Named Firestore Database Compatibility:
+// Firebase Storage cross-service rules (`firestore.exists` / `firestore.get`) only query the `(default)`
+// Firestore database. Because this project uses the named Firestore database
+// `ai-studio-n7aestheticsdrna-4af226be-e1d4-4376-b096-04af18ed7a92`, non-bootstrap staff accounts
+// must either have custom auth token claims (`role: 'admin' | 'editor'`) or have their `/staff_roles/{uid}`
+// document mirrored in the `(default)` Firestore database.
 service firebase.storage {
   match /b/{bucket}/o {
     // 1. Default-Deny Catch-All
@@ -14,13 +20,21 @@ service firebase.storage {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Flagged for clinic owner confirmation before production launch
+    // Primary clinic bootstrap administrator (flagged for clinic owner confirmation before public launch)
     function isBootstrappedAdmin() {
       return isSignedIn() && request.auth.token.email == 'dilseinvite@gmail.com';
     }
 
+    function hasAdminClaim() {
+      return isSignedIn() && ('role' in request.auth.token) && request.auth.token.role == 'admin';
+    }
+
+    function hasStaffClaim() {
+      return isSignedIn() && ('role' in request.auth.token) && request.auth.token.role in ['admin', 'editor'];
+    }
+
     function isAdmin() {
-      return isBootstrappedAdmin() || (
+      return isBootstrappedAdmin() || hasAdminClaim() || (
         isSignedIn() &&
         firestore.exists(/databases/(default)/documents/staff_roles/$(request.auth.uid)) &&
         firestore.get(/databases/(default)/documents/staff_roles/$(request.auth.uid)).data.role == 'admin'
@@ -28,13 +42,14 @@ service firebase.storage {
     }
 
     function isStaff() {
-      return isBootstrappedAdmin() || (
+      return isBootstrappedAdmin() || hasStaffClaim() || (
         isSignedIn() &&
         firestore.exists(/databases/(default)/documents/staff_roles/$(request.auth.uid)) &&
         firestore.get(/databases/(default)/documents/staff_roles/$(request.auth.uid)).data.role in ['admin', 'editor']
       );
     }
 
+    // 3. Strict Upload & Metadata Validation (Matched to AdminPage.tsx optimizeAndUploadMedia)
     function isValidImageUpload(filename) {
       return request.resource != null &&
         request.resource.size > 0 &&
@@ -44,10 +59,16 @@ service firebase.storage {
         filename.size() <= 140 &&
         filename.matches('^[a-zA-Z0-9_\\-]+\\.(webp|jpg|jpeg|png)$') &&
         request.resource.metadata != null &&
-        request.resource.metadata['uploadedByUid'] == request.auth.uid;
+        request.resource.metadata.keys().hasAll(['uploadedByUid', 'consentVerified', 'published', 'consentReference']) &&
+        request.resource.metadata.keys().hasOnly(['uploadedByUid', 'consentVerified', 'published', 'consentReference']) &&
+        request.resource.metadata['uploadedByUid'] == request.auth.uid &&
+        request.resource.metadata['consentVerified'] in ['true', 'false'] &&
+        request.resource.metadata['published'] in ['true', 'false'] &&
+        request.resource.metadata['consentReference'] is string &&
+        request.resource.metadata['consentReference'].size() <= 160;
     }
 
-    // 3. Public Editorial Assets (Treatments & Doctor Portrait)
+    // 4. Public Editorial Assets (Treatments & Doctor Portrait)
     // - No public directory listing (`list` restricted to staff)
     // - Immutable creation only (`resource == null`, `allow update: if false`) to prevent overwriting existing clinic assets
     match /n7_media/treatments/{filename} {
@@ -66,16 +87,19 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
-    // 4. Private Clinical Photographs (Pending Publication Consent Verification)
+    // 5. Private Clinical Photographs (Pending Publication Consent Verification)
     // - Strictly private: never readable by unauthenticated or non-staff users
     match /n7_media/clinical_results_private/{filename} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && resource == null && isValidImageUpload(filename);
+      allow create: if isStaff() &&
+        resource == null &&
+        isValidImageUpload(filename) &&
+        request.resource.metadata['published'] == 'false';
       allow update: if false;
       allow delete: if isAdmin();
     }
 
-    // 5. Consented Clinical Photographs
+    // 6. Consented Clinical Photographs
     // - Public `get` permitted ONLY when custom metadata explicitly confirms documented consent & publication approval
     match /n7_media/clinical_results_consented/{filename} {
       allow get: if (
@@ -83,7 +107,8 @@ service firebase.storage {
         resource.metadata['consentVerified'] == 'true' &&
         resource.metadata['published'] == 'true' &&
         resource.metadata['consentReference'] != null &&
-        resource.metadata['consentReference'].size() >= 2
+        resource.metadata['consentReference'].size() >= 2 &&
+        resource.metadata['consentReference'].size() <= 160
       ) || isStaff();
       allow list: if isStaff();
       allow create: if isStaff() &&
@@ -91,7 +116,8 @@ service firebase.storage {
         isValidImageUpload(filename) &&
         request.resource.metadata['consentVerified'] == 'true' &&
         request.resource.metadata['consentReference'] != null &&
-        request.resource.metadata['consentReference'].size() >= 2;
+        request.resource.metadata['consentReference'].size() >= 2 &&
+        request.resource.metadata['consentReference'].size() <= 160;
       allow update: if false;
       allow delete: if isAdmin();
     }

@@ -66,6 +66,7 @@ const ALLOWED_STORAGE_FOLDERS = new Set<AllowedStorageFolder>([
 async function optimizeAndUploadMedia(
   file: File,
   folder: AllowedStorageFolder,
+  staffRole: 'admin' | 'editor' | 'unauthorized',
   options?: {
     consentVerified?: boolean;
     published?: boolean;
@@ -75,6 +76,10 @@ async function optimizeAndUploadMedia(
   const currentUser = auth.currentUser;
   if (!currentUser || !currentUser.emailVerified) {
     throw new Error('Verified staff authentication is required to upload media.');
+  }
+
+  if (staffRole !== 'admin' && staffRole !== 'editor') {
+    throw new Error('Only authorized clinic staff (admin or editor) can upload media.');
   }
 
   if (!ALLOWED_STORAGE_FOLDERS.has(folder)) {
@@ -94,14 +99,12 @@ async function optimizeAndUploadMedia(
     throw new Error('File must be non-empty and not exceed the 5MB limit.');
   }
 
+  const trimmedConsentRef = (options?.consentReference || '').trim().slice(0, 160);
+
   if (folder === 'clinical_results_consented') {
-    if (
-      !options?.consentVerified ||
-      !options?.consentReference ||
-      options.consentReference.trim().length < 2
-    ) {
+    if (!options?.consentVerified || trimmedConsentRef.length < 2) {
       throw new Error(
-        'Clinical photographs cannot be uploaded to the consented archive without documented patient consent and a valid Consent Reference ID.'
+        'Clinical photographs cannot be uploaded to the consented archive without documented patient consent and a valid Consent Reference ID (2–160 characters).'
       );
     }
   }
@@ -132,7 +135,7 @@ async function optimizeAndUploadMedia(
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(dataUrl);
+        reject(new Error('Browser canvas context is unavailable for WebP image optimization.'));
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -142,36 +145,36 @@ async function optimizeAndUploadMedia(
     img.src = dataUrl;
   });
 
-  try {
-    const baseName = file.name
+  const baseName =
+    file.name
       .replace(/\.[^/.]+$/, '')
       .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 48);
-    const randomSuffix = Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 8) || 'asset';
-    const path = `n7_media/${folder}/${Date.now()}_${randomSuffix}_${baseName || 'image'}.webp`;
-    const sRef = storageRef(storage, path);
-    await uploadString(sRef, optimizedDataUrl, 'data_url', {
-      contentType: 'image/webp',
-      customMetadata: {
-        uploadedByUid: currentUser.uid,
-        consentVerified: options?.consentVerified ? 'true' : 'false',
-        published: options?.published ? 'true' : 'false',
-        consentReference: (options?.consentReference || '').trim().slice(0, 160),
-      },
-    });
-    const url = await getDownloadURL(sRef);
-    return url;
-  } catch {
-    if (
-      (folder === 'treatments' || folder === 'doctor') &&
-      optimizedDataUrl.length <= 980
-    ) {
-      return optimizedDataUrl;
-    }
-    throw new Error(
-      'Image optimized, but Firebase Storage bucket requires write rules (see storage.rules) or use a hosted /public/media/ path.'
-    );
-  }
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48) || 'image';
+  const randomSuffix =
+    Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 8) || 'asset';
+  const filename = `${Date.now()}_${randomSuffix}_${baseName}.webp`;
+  const path = `n7_media/${folder}/${filename}`;
+
+  const isConsentedFolder = folder === 'clinical_results_consented';
+  const isPrivateClinicalFolder = folder === 'clinical_results_private';
+
+  const sRef = storageRef(storage, path);
+  await uploadString(sRef, optimizedDataUrl, 'data_url', {
+    contentType: 'image/webp',
+    customMetadata: {
+      uploadedByUid: currentUser.uid,
+      consentVerified: isConsentedFolder && options?.consentVerified ? 'true' : 'false',
+      published:
+        isPrivateClinicalFolder
+          ? 'false'
+          : isConsentedFolder && options?.published
+          ? 'true'
+          : 'false',
+      consentReference: trimmedConsentRef,
+    },
+  });
+  return await getDownloadURL(sRef);
 }
 
 export function AdminPage() {
@@ -788,7 +791,7 @@ export function AdminPage() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
-                              const url = await optimizeAndUploadMedia(file, 'treatments');
+                              const url = await optimizeAndUploadMedia(file, 'treatments', role);
                               setTreatmentForm({ ...treatmentForm, cardImage: url });
                               showNotice('success', 'Image optimized & attached.');
                             } catch (err: any) {
@@ -931,7 +934,7 @@ export function AdminPage() {
                           const file = e.target.files?.[0];
                           if (!file) return;
                           try {
-                            const url = await optimizeAndUploadMedia(file, 'doctor');
+                            const url = await optimizeAndUploadMedia(file, 'doctor', role);
                             setSettingsForm({ ...settingsForm, doctorPortraitUrl: url });
                             showNotice('success', 'Doctor portrait optimized & uploaded.');
                           } catch (err: any) {
