@@ -1,0 +1,102 @@
+name: Pre-Deployment Security & Build Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pre-deployment-verification:
+    name: TypeScript, Build, API Security & Firebase Emulator Rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      GCLOUD_PROJECT: 'demo-n7-aesthetics'
+      FIREBASE_PROJECT: 'demo-n7-aesthetics'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 21 (for Firebase Local Emulators)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Run TypeScript check (npm run lint)
+        id: ts_check
+        run: npm run lint
+
+      - name: Run Vite production build (npm run build)
+        id: vite_build
+        run: npm run build
+
+      - name: Lint Firestore security rules syntax
+        id: rules_lint
+        run: npx eslint firestore.rules
+
+      - name: Run Firebase Emulator & API Security Tests
+        id: emulator_and_api_tests
+        env:
+          REQUIRE_FIREBASE_EMULATOR: 'true'
+        run: |
+          set -o pipefail
+          npx firebase-tools emulators:exec --only firestore,storage "npm run test:rules" | tee /tmp/security-tests.log
+          grep -q "API_SECURITY_TESTS: PASS" /tmp/security-tests.log
+          grep -q "FIREBASE_RULES_EMULATOR_TESTS: PASS" /tmp/security-tests.log
+
+      - name: Generate Pre-Deployment Test Summary
+        if: always()
+        run: |
+          TS_STATUS="FAIL"
+          if [ "${{ steps.ts_check.outcome }}" = "success" ]; then
+            TS_STATUS="PASS"
+          fi
+
+          BUILD_STATUS="FAIL"
+          if [ "${{ steps.vite_build.outcome }}" = "success" ]; then
+            BUILD_STATUS="PASS"
+          fi
+
+          EMULATOR_STATUS="FAIL"
+          API_STATUS="FAIL"
+          if [ -f /tmp/security-tests.log ]; then
+            if grep -q "FIREBASE_RULES_EMULATOR_TESTS: PASS" /tmp/security-tests.log && [ "${{ steps.emulator_and_api_tests.outcome }}" = "success" ]; then
+              EMULATOR_STATUS="PASS"
+            fi
+            if grep -q "API_SECURITY_TESTS: PASS" /tmp/security-tests.log; then
+              API_STATUS="PASS"
+            fi
+          fi
+
+          {
+            echo "## N7 Aesthetics Pre-Deployment Verification Summary"
+            echo ""
+            echo "| Check | Status |"
+            echo "| :--- | :--- |"
+            echo "| **TypeScript check** (\`npm run lint\`) | **${TS_STATUS}** |"
+            echo "| **Vite production build** (\`npm run build\`) | **${BUILD_STATUS}** |"
+            echo "| **Firebase rules emulator tests** (\`firestore.rules\` & \`storage.rules\`) | **${EMULATOR_STATUS}** |"
+            echo "| **API security tests** (\`/api/appointments\`) | **${API_STATUS}** |"
+            echo ""
+            echo "- **Target Project (Isolated Local Emulator):** \`demo-n7-aesthetics\` (Never connects to production Firebase)"
+            echo "- **Automatic Rules Deployment:** Disabled (Manual review & publish required)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"

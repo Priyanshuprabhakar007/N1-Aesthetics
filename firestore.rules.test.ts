@@ -7,8 +7,18 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, Timestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  Timestamp,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import handler, {
   resetAppointmentAbuseCachesForTest,
   setAppointmentServerDependenciesForTest,
@@ -17,7 +27,11 @@ import handler, {
   type IdempotencyAcquireResult,
 } from './api/appointments';
 
-const PROJECT_ID = 'gen-lang-client-0746984388';
+// Always use an offline demo-* project ID for emulator tests so tests never connect to production Firebase
+const EMULATOR_PROJECT_ID = process.env.GCLOUD_PROJECT?.startsWith('demo-')
+  ? process.env.GCLOUD_PROJECT
+  : 'demo-n7-aesthetics';
+
 const FIRESTORE_RULES = fs.readFileSync(path.join(process.cwd(), 'firestore.rules'), 'utf8');
 const STORAGE_RULES = fs.readFileSync(path.join(process.cwd(), 'storage.rules'), 'utf8');
 
@@ -26,7 +40,7 @@ async function isFirebaseEmulatorRunning(): Promise<boolean> {
     return true;
   }
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 600);
+  const timeoutId = setTimeout(() => controller.abort(), 800);
   try {
     const resp = await fetch('http://127.0.0.1:4400/emulators', {
       signal: controller.signal,
@@ -43,7 +57,8 @@ async function isFirebaseEmulatorRunning(): Promise<boolean> {
 
 /**
  * Real Firebase Security Rules Emulator Test Suite using @firebase/rules-unit-testing
- * Executes against live Firestore & Storage emulators when FIRESTORE_EMULATOR_HOST / port 8080 is reachable.
+ * Executes against live local Firestore & Storage emulators.
+ * Never connects to the production Firebase database.
  */
 export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
   const firestoreHostEnv = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
@@ -55,7 +70,7 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
   const stPort = Number.parseInt(stPortRaw || '9199', 10);
 
   const testEnv: RulesTestEnvironment = await initializeTestEnvironment({
-    projectId: PROJECT_ID,
+    projectId: EMULATOR_PROJECT_ID,
     firestore: {
       host: fsHost,
       port: fsPort,
@@ -155,7 +170,35 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       role: 'admin',
     });
 
-    // 1. Unauthenticated & regular users cannot read or modify appointment enquiries
+    // 1. Public visitor can create a valid enquiry with privacyConsent == true, but cannot create without consent
+    await assertSucceeds(
+      setDoc(doc(unauthContext.firestore(), 'appointment_enquiries', 'enq_public_valid_1'), {
+        name: 'Priya Verma',
+        phone: '+919876543219',
+        treatment: 'rhinoplasty',
+        preferredDate: '2026-12-28',
+        privacyConsent: true,
+        status: 'new',
+        assignedTo: 'unassigned',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    await assertFails(
+      setDoc(doc(unauthContext.firestore(), 'appointment_enquiries', 'enq_public_noconsent_1'), {
+        name: 'Priya Verma',
+        phone: '+919876543219',
+        treatment: 'rhinoplasty',
+        preferredDate: '2026-12-28',
+        privacyConsent: false,
+        status: 'new',
+        assignedTo: 'unassigned',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+
+    // 2. Unauthenticated & regular users cannot read or modify appointment enquiries
     await assertFails(getDoc(doc(unauthContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
     await assertFails(getDoc(doc(regularUserContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
     await assertFails(getDoc(doc(spoofedUnverifiedAdminContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
@@ -165,31 +208,33 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       })
     );
 
-    // 2. Staff (editor & admin) can read appointment enquiries; only admin can delete
+    // 3. Staff (editor & admin) can read appointment enquiries; only admin can delete
     await assertSucceeds(getDoc(doc(editorContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
     await assertFails(deleteDoc(doc(editorContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
     await assertSucceeds(deleteDoc(doc(bootstrapAdminContext.firestore(), 'appointment_enquiries', 'enq_seeded_1')));
 
-    // 3. Regular users cannot assign themselves admin or editor roles
+    // 4. Regular users cannot assign themselves admin or editor roles
     await assertFails(
       setDoc(doc(regularUserContext.firestore(), 'staff_roles', 'user_regular_1'), {
         uid: 'user_regular_1',
         email: 'visitor@example.com',
         role: 'admin',
-        createdAt: Timestamp.now(),
+        createdAt: serverTimestamp(),
       })
     );
     await assertFails(getDocs(collection(regularUserContext.firestore(), 'staff_roles')));
 
-    // 4. Public can read testimonials and clinical results ONLY when published == true && consentVerified == true
+    // 5. Public can read testimonials and clinical results ONLY when published == true && consentVerified == true
     await assertFails(getDoc(doc(unauthContext.firestore(), 'testimonials', 'test_unconsented')));
     await assertSucceeds(getDoc(doc(unauthContext.firestore(), 'testimonials', 'test_consented')));
     await assertFails(getDoc(doc(unauthContext.firestore(), 'clinical_results', 'res_unconsented')));
     await assertSucceeds(getDoc(doc(unauthContext.firestore(), 'clinical_results', 'res_consented')));
 
-    // 5. Storage rules verification
-    const tinyWebpDataUrl =
-      'data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
+    // 6. Storage rules verification
+    const validWebpBytes = new Uint8Array([
+      82, 73, 70, 70, 34, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32, 22, 0, 0, 0, 48, 1, 0, 157, 1,
+      42, 1, 0, 1, 0, 14, 192, 254, 37, 164, 0, 3, 112, 0, 0, 0, 0,
+    ]);
 
     // Regular user cannot upload to treatments folder
     const unauthTreatmentRef = storageRef(
@@ -197,7 +242,7 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       'n7_media/treatments/1762380000000_abc12345_rhinoplasty.webp'
     );
     await assertFails(
-      uploadString(unauthTreatmentRef, tinyWebpDataUrl, 'data_url', {
+      uploadBytes(unauthTreatmentRef, validWebpBytes, {
         contentType: 'image/webp',
         customMetadata: {
           uploadedByUid: 'user_regular_1',
@@ -214,7 +259,7 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       'n7_media/treatments/1762380000000_abc12345_rhinoplasty.webp'
     );
     await assertSucceeds(
-      uploadString(editorTreatmentRef, tinyWebpDataUrl, 'data_url', {
+      uploadBytes(editorTreatmentRef, validWebpBytes, {
         contentType: 'image/webp',
         customMetadata: {
           uploadedByUid: 'editor_uid_1',
@@ -231,7 +276,7 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       'n7_media/clinical_results_consented/1762380000000_abc12345_case1.webp'
     );
     await assertFails(
-      uploadString(unconsentedResultRef, tinyWebpDataUrl, 'data_url', {
+      uploadBytes(unconsentedResultRef, validWebpBytes, {
         contentType: 'image/webp',
         customMetadata: {
           uploadedByUid: 'editor_uid_1',
@@ -248,7 +293,7 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
       'n7_media/clinical_results_consented/1762380000000_abc12345_case2.webp'
     );
     await assertSucceeds(
-      uploadString(consentedResultRef, tinyWebpDataUrl, 'data_url', {
+      uploadBytes(consentedResultRef, validWebpBytes, {
         contentType: 'image/webp',
         customMetadata: {
           uploadedByUid: 'editor_uid_1',
@@ -262,12 +307,14 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
 
     // Editor cannot delete storage object; Admin can delete
     await assertFails(deleteObject(editorTreatmentRef));
-    await assertSucceeds(deleteObject(
-      storageRef(
-        bootstrapAdminContext.storage(),
-        'n7_media/treatments/1762380000000_abc12345_rhinoplasty.webp'
+    await assertSucceeds(
+      deleteObject(
+        storageRef(
+          bootstrapAdminContext.storage(),
+          'n7_media/treatments/1762380000000_abc12345_rhinoplasty.webp'
+        )
       )
-    ));
+    );
   } finally {
     await testEnv.cleanup();
   }
@@ -275,16 +322,8 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
 
 /**
  * Comprehensive server-side security test suite for /api/appointments.ts
- * Verifies:
- * 1. Authenticated Firestore record existence & schema validation before webhook dispatch
- * 2. Complete removal of NOTIFICATION_SKIP_FIRESTORE_CHECK bypass
- * 3. Anti-forgery: client-supplied fields cannot forge notification metadata; webhook payload uses verified Firestore record
- * 4. Persistent, atomic idempotency lock preventing duplicate messages across invocations + safe retry on transient failure
- * 5. Distributed rate limiting & fail-safe (fail-closed) behavior when distributed limiter is unavailable
- * 6. Storage path & metadata contract compatibility between AdminPage.tsx and storage.rules
  */
 async function runAppointmentApiAndContractTests(): Promise<void> {
-  // Verify storage.rules and AdminPage.tsx alignment on paths and metadata keys
   const adminPageSource = fs.readFileSync(
     path.join(process.cwd(), 'src/pages/AdminPage.tsx'),
     'utf8'
@@ -300,7 +339,6 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
     'AdminPage.tsx must upload to n7_media/{folder}/{filename}'
   );
 
-  // Set up an in-memory mock of the privileged Firebase Admin backend to test /api/appointments logic deterministically
   const storedEnquiries = new Map<string, VerifiedFirestoreEnquiryRecord>();
   const notificationLocks = new Map<
     string,
@@ -381,9 +419,10 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   let webhookStatusesToReturn: number[] = [200];
 
   const mockFetch: typeof fetch = async (input: any, init?: any) => {
-    const status = webhookStatusesToReturn.length > 1
-      ? webhookStatusesToReturn.shift()!
-      : webhookStatusesToReturn[0] || 200;
+    const status =
+      webhookStatusesToReturn.length > 1
+        ? webhookStatusesToReturn.shift()!
+        : webhookStatusesToReturn[0] || 200;
     dispatchedWebhooks.push({
       url: String(input),
       headers: (init?.headers as Record<string, string>) || {},
@@ -512,7 +551,10 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   assert.strictEqual(rVerified.statusCode, 200);
   assert.strictEqual(rVerified.jsonBody.mode, 'notification_sent');
   assert.strictEqual(dispatchedWebhooks.length, 1);
-  assert.strictEqual(dispatchedWebhooks[0].headers['Idempotency-Key'], `n7-enquiry-${validEnquiryId}`);
+  assert.strictEqual(
+    dispatchedWebhooks[0].headers['Idempotency-Key'],
+    `n7-enquiry-${validEnquiryId}`
+  );
   assert.strictEqual(dispatchedWebhooks[0].body.enquiryId, validEnquiryId);
   assert.strictEqual(dispatchedWebhooks[0].body.treatment, 'rhinoplasty');
   assert.strictEqual(dispatchedWebhooks[0].body.preferredDate, '2026-12-20');
@@ -550,7 +592,7 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
     createdAtMs: now3,
     createdAtIso: new Date(now3).toISOString(),
   });
-  webhookStatusesToReturn = [503, 200]; // First attempt 503, second attempt 200 OK
+  webhookStatusesToReturn = [503, 200];
   const rTransientRetry = await invokeApi(
     {
       enquiryId: retryEnquiryId,
@@ -566,7 +608,11 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   );
   assert.strictEqual(rTransientRetry.statusCode, 200);
   assert.strictEqual(rTransientRetry.jsonBody.mode, 'notification_sent');
-  assert.strictEqual(dispatchedWebhooks.length, 3, 'Should have attempted 1 transient 503 + 1 successful retry');
+  assert.strictEqual(
+    dispatchedWebhooks.length,
+    3,
+    'Should have attempted 1 transient 503 + 1 successful retry'
+  );
 
   // Test 6: Fail safely (fail closed) when distributed rate limiter is unavailable
   rateLimiterAvailable = false;
@@ -598,18 +644,36 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
 async function main() {
   // 1. Run /api/appointments & storage/admin contract tests
   await runAppointmentApiAndContractTests();
-  console.log('PASS: /api/appointments server-side verification, idempotency, retry, and distributed rate-limit tests passed.');
+  console.log(
+    'API_SECURITY_TESTS: PASS (/api/appointments server-side verification, idempotency, retry, and distributed rate-limit tests passed).'
+  );
 
-  // 2. Check if Firebase Rules Emulator is active
+  // 2. Check if Firebase Rules Emulator is required (in CI / emulators:exec) or reachable
+  const requireEmulator =
+    process.env.REQUIRE_FIREBASE_EMULATOR === 'true' ||
+    process.env.GITHUB_ACTIONS === 'true' ||
+    Boolean(process.env.FIRESTORE_EMULATOR_HOST) ||
+    Boolean(process.env.FIREBASE_EMULATOR_HUB);
+
   const emulatorRunning = await isFirebaseEmulatorRunning();
-  if (emulatorRunning) {
-    await runRealFirebaseEmulatorRulesTests();
-    console.log('PASS: Real Firebase Security Rules Emulator tests (firestore.rules & storage.rules) passed.');
-  } else {
+
+  if (!emulatorRunning) {
+    if (requireEmulator) {
+      console.error(
+        'FIREBASE_RULES_EMULATOR_TESTS: FAIL — Required Firebase Firestore/Storage Emulator is not reachable.'
+      );
+      process.exit(1);
+    }
     console.log(
-      'EMULATOR_STATUS: NOT_RUN (Local Firestore/Storage Emulator port 127.0.0.1:8080 is not active because a Java JVM runtime is not installed in this container. Run `npm run test:rules:emulator` in an environment with Java 11+ installed to execute `runRealFirebaseEmulatorRulesTests()`).'
+      'FIREBASE_RULES_EMULATOR_TESTS: NOT_RUN (Local Firestore/Storage Emulator is not active because Java JVM is not installed in this container. In GitHub Actions or any environment with Java 21, run `npx firebase-tools emulators:exec --only firestore,storage "npm run test:rules"`).'
     );
+    return;
   }
+
+  await runRealFirebaseEmulatorRulesTests();
+  console.log(
+    'FIREBASE_RULES_EMULATOR_TESTS: PASS (Real Firebase Security Rules Emulator tests for firestore.rules & storage.rules passed).'
+  );
 }
 
 main().catch((err) => {
