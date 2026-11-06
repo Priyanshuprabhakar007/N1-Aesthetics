@@ -244,57 +244,6 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Public Treatments listener
-    const qTreatments = query(
-      collection(db, 'treatments'),
-      where('approvalStatus', 'in', ['draft_pending_clinic_approval', 'approved_by_clinic'])
-    );
-    const unsubTreatments = onSnapshot(
-      qTreatments,
-      (snap) => {
-        if (!snap.empty) {
-          const dbDocs = snap.docs.map((docSnap) => {
-            const d = docSnap.data();
-            const existingMatch = siteContent.treatments.find((t) => t.slug === d.slug);
-            const rawCardImage = typeof d.cardImage === 'string' ? d.cardImage : '';
-            const resolvedCardImage =
-              !rawCardImage || rawCardImage.endsWith('.svg')
-                ? existingMatch?.cardImage || '/media/treatment-skin-rejuvenation.jpg'
-                : rawCardImage;
-            return {
-              slug: d.slug,
-              title: d.title,
-              shortTitle: d.shortTitle,
-              category: d.category || existingMatch?.category || 'Surgical Procedures',
-              isSignature: Boolean(d.isSignature),
-              approvalStatus: d.approvalStatus,
-              verificationStatus:
-                d.approvalStatus === 'approved_by_clinic'
-                  ? 'confirmed_core_focus'
-                  : existingMatch?.verificationStatus || 'unconfirmed_requires_clinic_verification',
-              cardImage: resolvedCardImage,
-              imageAlt: existingMatch?.imageAlt || `${d.title} editorial photograph`,
-              isIllustrativeAsset: true as const,
-              summary: d.summary,
-              overview: d.overview,
-              consultationFocus: existingMatch?.consultationFocus || [
-                'Individualised anatomical assessment and clinical evaluation',
-              ],
-              candidacyConsiderations: existingMatch?.candidacyConsiderations || [
-                'Assessed in person during surgical consultation',
-              ],
-              recoveryOverview:
-                existingMatch?.recoveryOverview ||
-                'Discussed individually during consultation based on surgical scope.',
-              faqs: existingMatch?.faqs || [],
-            } satisfies TreatmentItem;
-          });
-          setTreatments(dbDocs);
-        }
-      },
-      () => {}
-    );
-
     // Public Consented Testimonials listener
     const qTestimonials = query(
       collection(db, 'testimonials'),
@@ -380,12 +329,88 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubSettings();
-      unsubTreatments();
       unsubTestimonials();
       unsubResults();
       unsubBlog();
     };
   }, []);
+
+  // 3. Treatments listener:
+  // - Public / unauthenticated visitors query ONLY `approvalStatus == 'approved_by_clinic'`
+  // - Verified staff (admin / editor) query both `draft_pending_clinic_approval` and `approved_by_clinic`
+  useEffect(() => {
+    const isVerifiedStaff = authReady && (role === 'admin' || role === 'editor');
+
+    const qTreatments = isVerifiedStaff
+      ? query(
+          collection(db, 'treatments'),
+          where('approvalStatus', 'in', ['draft_pending_clinic_approval', 'approved_by_clinic'])
+        )
+      : query(
+          collection(db, 'treatments'),
+          where('approvalStatus', '==', 'approved_by_clinic')
+        );
+
+    const unsubTreatments = onSnapshot(
+      qTreatments,
+      (snap) => {
+        if (!snap.empty) {
+          const dbDocs: TreatmentItem[] = snap.docs.map((docSnap) => {
+            const d = docSnap.data();
+            const existingMatch = siteContent.treatments.find((t) => t.slug === d.slug);
+            const rawCardImage = typeof d.cardImage === 'string' ? d.cardImage : '';
+            const resolvedCardImage =
+              !rawCardImage || rawCardImage.endsWith('.svg')
+                ? existingMatch?.cardImage || '/media/treatment-skin-rejuvenation.jpg'
+                : rawCardImage;
+            return {
+              slug: d.slug,
+              title: d.title,
+              shortTitle: d.shortTitle,
+              category: d.category || existingMatch?.category || 'Surgical Procedures',
+              isSignature: Boolean(d.isSignature),
+              approvalStatus: d.approvalStatus,
+              verificationStatus:
+                d.approvalStatus === 'approved_by_clinic'
+                  ? 'confirmed_core_focus'
+                  : existingMatch?.verificationStatus || 'unconfirmed_requires_clinic_verification',
+              cardImage: resolvedCardImage,
+              imageAlt: existingMatch?.imageAlt || `${d.title} editorial photograph`,
+              isIllustrativeAsset: true as const,
+              summary: d.summary,
+              overview: d.overview,
+              consultationFocus: existingMatch?.consultationFocus || [
+                'Individualised anatomical assessment and clinical evaluation',
+              ],
+              candidacyConsiderations: existingMatch?.candidacyConsiderations || [
+                'Assessed in person during surgical consultation',
+              ],
+              recoveryOverview:
+                existingMatch?.recoveryOverview ||
+                'Discussed individually during consultation based on surgical scope.',
+              faqs: existingMatch?.faqs || [],
+            } satisfies TreatmentItem;
+          });
+
+          const bySlug = new Map(dbDocs.map((item) => [item.slug, item]));
+          const mergedBase = siteContent.treatments.map(
+            (staticItem) => bySlug.get(staticItem.slug) || staticItem
+          );
+          const customDocs = dbDocs.filter(
+            (item) => !siteContent.treatments.some((s) => s.slug === item.slug)
+          );
+          setTreatments([...mergedBase, ...customDocs]);
+        } else {
+          setTreatments(siteContent.treatments);
+        }
+      },
+      () => {}
+    );
+
+    return () => {
+      unsubTreatments();
+    };
+  }, [authReady, role]);
 
   const signInWithGoogle = async () => {
     await signInWithPopup(auth, googleProvider);

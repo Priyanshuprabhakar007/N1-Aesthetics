@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, ArrowUpRight, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { siteContent } from '../content/site';
+import { useCms } from '../context/CmsContext';
 import { Link } from '../lib/router';
 import { Image } from '../components/LuxuryImage';
 import { BookingSection } from '../components/BookingSection';
@@ -13,7 +14,10 @@ interface TreatmentDetailPageProps {
 }
 
 export function TreatmentDetailPage({ slug }: TreatmentDetailPageProps) {
-  const treatment = siteContent.treatments.find((t) => t.slug === slug);
+  const { treatments } = useCms();
+  const treatment =
+    treatments.find((t) => t.slug === slug) ||
+    siteContent.treatments.find((t) => t.slug === slug);
 
   if (!treatment) {
     return (

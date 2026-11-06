@@ -187,10 +187,10 @@ service cloud.firestore {
       allow delete: if isValidId(enquiryId) && isAdmin();
     }
 
-    // Treatments Catalog
+    // Treatments Catalog — Only approved_by_clinic visible publicly; draft & approved visible to staff
     match /treatments/{treatmentId} {
-      allow get: if isValidId(treatmentId) && (resource.data.approvalStatus in ['draft_pending_clinic_approval', 'approved_by_clinic'] || isStaff());
-      allow list: if resource.data.approvalStatus in ['draft_pending_clinic_approval', 'approved_by_clinic'] || isStaff();
+      allow get: if isValidId(treatmentId) && (resource.data.approvalStatus == 'approved_by_clinic' || isStaff());
+      allow list: if resource.data.approvalStatus == 'approved_by_clinic' || isStaff();
       allow create: if isValidId(treatmentId) && isSignedIn() && isValidTreatmentDoc(incoming()) && isStaff() && incoming().slug == treatmentId && incoming().updatedAt == request.time;
       allow update: if isValidId(treatmentId) && isSignedIn() && isValidTreatmentDoc(incoming()) && isStaff() &&
         incoming().slug == existing().slug &&

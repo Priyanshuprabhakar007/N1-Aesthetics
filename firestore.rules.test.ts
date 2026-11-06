@@ -15,6 +15,8 @@ import {
   deleteDoc,
   collection,
   getDocs,
+  query,
+  where,
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -148,6 +150,32 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
         authorUid: 'admin_uid_1',
         updatedAt: Timestamp.now(),
       });
+      await setDoc(doc(adminDb, 'treatments', 'rhinoplasty'), {
+        slug: 'rhinoplasty',
+        title: 'Rhinoplasty',
+        shortTitle: 'Rhinoplasty',
+        category: 'Facial Plastic Surgery',
+        summary: 'Structural and aesthetic nasal refinement.',
+        overview: 'Comprehensive evaluation of nasal harmony and airway function.',
+        cardImage: '/media/treatment-rhinoplasty.jpg',
+        approvalStatus: 'approved_by_clinic',
+        isSignature: true,
+        authorUid: 'admin_uid_1',
+        updatedAt: Timestamp.now(),
+      });
+      await setDoc(doc(adminDb, 'treatments', 'hair-transplant'), {
+        slug: 'hair-transplant',
+        title: 'Hair Transplant',
+        shortTitle: 'Hair Transplant',
+        category: 'Hair Restoration',
+        summary: 'Draft procedure concept pending clinic approval.',
+        overview: 'Follicular unit restoration planning.',
+        cardImage: '/media/treatment-hair-transplant.jpg',
+        approvalStatus: 'draft_pending_clinic_approval',
+        isSignature: true,
+        authorUid: 'admin_uid_1',
+        updatedAt: Timestamp.now(),
+      });
     });
 
     const unauthContext = testEnv.unauthenticatedContext();
@@ -230,7 +258,45 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
     await assertFails(getDoc(doc(unauthContext.firestore(), 'clinical_results', 'res_unconsented')));
     await assertSucceeds(getDoc(doc(unauthContext.firestore(), 'clinical_results', 'res_consented')));
 
-    // 6. Storage rules verification
+    // 6. Treatments access rules:
+    // - Public access to approved treatment succeeds
+    await assertSucceeds(getDoc(doc(unauthContext.firestore(), 'treatments', 'rhinoplasty')));
+    // - Public access to draft treatment fails
+    await assertFails(getDoc(doc(unauthContext.firestore(), 'treatments', 'hair-transplant')));
+    // - Public listing of approved treatments works without permission errors
+    const publicApprovedSnap = await assertSucceeds(
+      getDocs(
+        query(
+          collection(unauthContext.firestore(), 'treatments'),
+          where('approvalStatus', '==', 'approved_by_clinic')
+        )
+      )
+    );
+    assert.strictEqual(publicApprovedSnap.docs.length, 1);
+    assert.strictEqual(publicApprovedSnap.docs[0].id, 'rhinoplasty');
+    // - Public listing that includes draft treatments fails
+    await assertFails(
+      getDocs(
+        query(
+          collection(unauthContext.firestore(), 'treatments'),
+          where('approvalStatus', 'in', ['draft_pending_clinic_approval', 'approved_by_clinic'])
+        )
+      )
+    );
+    // - Authorized staff (editor & admin) can access draft treatments and list both draft & approved treatments
+    await assertSucceeds(getDoc(doc(editorContext.firestore(), 'treatments', 'hair-transplant')));
+    await assertSucceeds(getDoc(doc(bootstrapAdminContext.firestore(), 'treatments', 'hair-transplant')));
+    const staffAllTreatmentsSnap = await assertSucceeds(
+      getDocs(
+        query(
+          collection(editorContext.firestore(), 'treatments'),
+          where('approvalStatus', 'in', ['draft_pending_clinic_approval', 'approved_by_clinic'])
+        )
+      )
+    );
+    assert.strictEqual(staffAllTreatmentsSnap.docs.length, 2);
+
+    // 7. Storage rules verification
     const validWebpBytes = new Uint8Array([
       82, 73, 70, 70, 34, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32, 22, 0, 0, 0, 48, 1, 0, 157, 1,
       42, 1, 0, 1, 0, 14, 192, 254, 37, 164, 0, 3, 112, 0, 0, 0, 0,
@@ -327,6 +393,23 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   const adminPageSource = fs.readFileSync(
     path.join(process.cwd(), 'src/pages/AdminPage.tsx'),
     'utf8'
+  );
+  const cmsContextSource = fs.readFileSync(
+    path.join(process.cwd(), 'src/context/CmsContext.tsx'),
+    'utf8'
+  );
+  assert.ok(
+    FIRESTORE_RULES.includes(
+      "allow get: if isValidId(treatmentId) && (resource.data.approvalStatus == 'approved_by_clinic' || isStaff());"
+    ) &&
+      FIRESTORE_RULES.includes(
+        "allow list: if resource.data.approvalStatus == 'approved_by_clinic' || isStaff();"
+      ),
+    'firestore.rules must restrict public treatment get/list to approvalStatus == approved_by_clinic while allowing staff access to drafts'
+  );
+  assert.ok(
+    cmsContextSource.includes("where('approvalStatus', '==', 'approved_by_clinic')"),
+    'CmsContext.tsx must filter public treatment queries by approvalStatus == approved_by_clinic'
   );
   assert.ok(
     STORAGE_RULES.includes(

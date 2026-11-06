@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowUpRight, AlertCircle } from 'lucide-react';
 import { siteContent } from '../content/site';
+import { useCms } from '../context/CmsContext';
 import { Link } from '../lib/router';
 import { Image } from '../components/LuxuryImage';
 import { SectionReveal } from '../components/SectionReveal';
@@ -8,17 +9,18 @@ import { SeoHead } from '../components/SeoHead';
 import styles from '../styles/luxury.module.css';
 
 export function TreatmentsPage() {
+  const { treatments } = useCms();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const categories = [
     'All',
-    ...Array.from(new Set(siteContent.treatments.map((t) => t.category))),
+    ...Array.from(new Set(treatments.map((t) => t.category))),
   ];
 
   const filteredTreatments =
     selectedCategory === 'All'
-      ? siteContent.treatments
-      : siteContent.treatments.filter((t) => t.category === selectedCategory);
+      ? treatments
+      : treatments.filter((t) => t.category === selectedCategory);
 
   return (
     <>
