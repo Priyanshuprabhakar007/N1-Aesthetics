@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowUpRight, ShieldCheck, CheckCircle2, FileCheck2, Lock } from 'lucide-react';
 import { siteContent } from '../content/site';
 import { useCms } from '../context/CmsContext';
 import { Link } from '../lib/router';
 import { SectionReveal } from '../components/SectionReveal';
 import { SeoHead } from '../components/SeoHead';
+import { prefersReducedMotion } from '../lib/gsap';
 import styles from '../styles/luxury.module.css';
+
+const ABOUT_HERO_IMAGE_SRC = '/images/about-clinic-architecture.jpg';
 
 export function AboutPage() {
   const { settings } = useCms();
+  const [heroImageLoaded, setHeroImageLoaded] = useState(() => prefersReducedMotion());
 
   return (
     <>
@@ -18,8 +22,37 @@ export function AboutPage() {
         canonicalPath="/about"
       />
 
-      <section className="bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
-        <div className={styles.containerLuxury}>
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
+        {/* Seamless right-aligned architectural interior atmosphere (occupies ~44% on desktop, softened backdrop on mobile) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[46%] select-none"
+        >
+          <img
+            src={ABOUT_HERO_IMAGE_SRC}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            sizes="(min-width: 1024px) 46vw, 100vw"
+            onLoad={() => setHeroImageLoaded(true)}
+            className={`h-full w-full object-cover object-[74%_52%] brightness-[0.82] contrast-[1.04] saturate-[0.88] sepia-[0.08] transition-opacity duration-1000 ease-out motion-reduce:transition-none ${
+              heroImageLoaded
+                ? 'opacity-30 sm:opacity-40 lg:opacity-85'
+                : 'opacity-0'
+            }`}
+          />
+
+          {/* Smooth left-to-right dark chocolate feathering so the image dissolves seamlessly into #211A17 without any hard edge */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#211A17] via-[#211A17]/82 lg:via-[#211A17]/52 to-[#211A17]/25" />
+
+          {/* Top and bottom espresso/taupe feathering matching the section vertical gradient */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#211A17]/80 via-transparent to-[#30251F]/90" />
+
+          {/* Subtle warm bronze/espresso color-grading wash */}
+          <div className="absolute inset-0 bg-[#261C17]/28 mix-blend-multiply" />
+        </div>
+
+        <div className={`${styles.containerLuxury} relative z-10`}>
           <SectionReveal className="max-w-3xl space-y-5">
             <div className="flex items-center gap-4">
               <span className="text-xs uppercase tracking-[0.3em] text-[#E6CDB5]/80 font-medium">

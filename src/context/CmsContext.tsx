@@ -407,10 +407,16 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
             );
             setTreatments([...mergedBase, ...customDocs]);
           } else {
-            const approvedOnly = dbDocs.filter(
-              (item) => item.approvalStatus === 'approved_by_clinic'
+            const bySlug = new Map(dbDocs.map((item) => [item.slug, item]));
+            const mergedApprovedBase = approvedStaticTreatments
+              .map((staticItem) => bySlug.get(staticItem.slug) || staticItem)
+              .filter((item) => item.approvalStatus === 'approved_by_clinic');
+            const customApprovedDocs = dbDocs.filter(
+              (item) =>
+                item.approvalStatus === 'approved_by_clinic' &&
+                !approvedStaticTreatments.some((s) => s.slug === item.slug)
             );
-            setTreatments(approvedOnly);
+            setTreatments([...mergedApprovedBase, ...customApprovedDocs]);
           }
         } else {
           setTreatments(isVerifiedStaff ? siteContent.treatments : approvedStaticTreatments);

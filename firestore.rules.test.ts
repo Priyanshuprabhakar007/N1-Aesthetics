@@ -41,6 +41,19 @@ import {
   processBookingSubmission,
 } from './src/lib/bookingValidation';
 import { siteContent, type TreatmentItem } from './src/content/site';
+import {
+  HERO_AUTOPLAY_INTERVAL_MS,
+  HERO_CROSSFADE_DURATION_SEC,
+  HERO_KEN_BURNS_MAX_SCALE,
+  HERO_SLIDES,
+  computeSlideAnnotationGeometry,
+  getApprovedHeroSlides,
+  isSlidePointerClearOfFacialFeatures,
+} from './src/lib/heroSlides';
+import {
+  WHATSAPP_PREFILLED_MESSAGE,
+  resolveWhatsappCtaState,
+} from './src/lib/mobileCta';
 
 // Always use an offline demo-* project ID for emulator tests so tests never connect to production Firebase
 const EMULATOR_PROJECT_ID = process.env.GCLOUD_PROJECT?.startsWith('demo-')
@@ -788,8 +801,20 @@ async function runBookingFormAndPublicTreatmentTests(): Promise<void> {
     'Draft treatment must not be preselected on public forms'
   );
 
+  // Verify siteContent.treatments has the 5 approved core treatments and excludes the draft reconstructive-consultation
+  const sitePublicOptions = getPublicBookingOptions(siteContent.treatments);
+  assert.strictEqual(sitePublicOptions.length, 6);
+  assert.ok(
+    !sitePublicOptions.some((o) => o.value === 'reconstructive-consultation' || o.label.includes('Draft')),
+    'Draft reconstructive-consultation treatment must not appear in public booking options'
+  );
+
   // When all treatments are drafts, General Aesthetic Consultation is still available
-  const allDraftOptions = getPublicBookingOptions(siteContent.treatments);
+  const allDrafts = siteContent.treatments.map((t) => ({
+    ...t,
+    approvalStatus: 'draft_pending_clinic_approval' as const,
+  }));
+  const allDraftOptions = getPublicBookingOptions(allDrafts);
   assert.deepStrictEqual(allDraftOptions, [
     {
       value: GENERAL_CONSULTATION_OPTION.value,
@@ -933,6 +958,292 @@ async function runBookingFormAndPublicTreatmentTests(): Promise<void> {
     liveResult503.serverResponse.title,
     'Enquiry Saved — Automated Staff Notification Pending'
   );
+
+  // 5. Simplified Consultation Popup Mode (isSimplifiedPopup: true):
+  // Submits with only name, phone, preferredDate, and privacyConsent (no treatment, email, or message required)
+  const popupValidationErrors = validateBookingForm(
+    {
+      name: 'Kabir Bedi',
+      phone: '+91 98111 22333',
+      email: '',
+      treatment: '',
+      preferredDate: '2026-11-18',
+      message: '',
+      privacyConsent: true,
+      website_url: '',
+    },
+    approvedList,
+    fixedNow,
+    { isSimplifiedPopup: true }
+  );
+  assert.deepStrictEqual(
+    popupValidationErrors,
+    {},
+    'Simplified popup must not produce validation errors when treatment, email, and message are omitted'
+  );
+
+  const popupInvalidErrors = validateBookingForm(
+    {
+      name: 'K',
+      phone: '12',
+      email: 'not-checked-in-popup',
+      treatment: '',
+      preferredDate: '2026-11-01', // past date
+      message: 'x'.repeat(600),
+      privacyConsent: false,
+      website_url: '',
+    },
+    approvedList,
+    fixedNow,
+    { isSimplifiedPopup: true }
+  );
+  assert.ok(popupInvalidErrors.name, 'Simplified popup must still validate name');
+  assert.ok(popupInvalidErrors.phone, 'Simplified popup must still validate phone');
+  assert.ok(popupInvalidErrors.preferredDate, 'Simplified popup must still validate preferredDate');
+  assert.ok(popupInvalidErrors.privacyConsent, 'Simplified popup must still validate privacyConsent');
+  assert.strictEqual(popupInvalidErrors.treatment, undefined);
+  assert.strictEqual(popupInvalidErrors.email, undefined);
+  assert.strictEqual(popupInvalidErrors.message, undefined);
+
+  let popupLiveCmsPayload: any = null;
+  let popupLiveApiBody: any = null;
+  const popupLiveResult = await processBookingSubmission({
+    form: {
+      name: 'Kabir Bedi',
+      phone: '+91 98111 22333',
+      email: '',
+      treatment: '',
+      preferredDate: '2026-11-18',
+      message: '',
+      privacyConsent: true,
+      website_url: '',
+    },
+    bookingLiveMode: true,
+    isSimplifiedPopup: true,
+    approvedTreatments: approvedList,
+    submitEnquiryToCms: async (payload) => {
+      popupLiveCmsPayload = payload;
+      return 'enq_1762380000000_popup01';
+    },
+    fetchImpl: (async (_url: any, init: any) => {
+      popupLiveApiBody = JSON.parse(String(init.body));
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { ok: true, notificationStatus: 'sent' };
+        },
+      } as Response;
+    }) as typeof fetch,
+    now: fixedNow,
+  });
+
+  assert.strictEqual(popupLiveResult.ok, true);
+  assert.strictEqual(
+    popupLiveCmsPayload.treatment,
+    GENERAL_CONSULTATION_OPTION.value,
+    'Simplified popup must supply general-consultation internally to Firestore'
+  );
+  assert.strictEqual(popupLiveCmsPayload.email, undefined);
+  assert.strictEqual(popupLiveCmsPayload.message, undefined);
+  assert.strictEqual(
+    popupLiveApiBody.treatment,
+    GENERAL_CONSULTATION_OPTION.value,
+    'Simplified popup must supply general-consultation internally to /api/appointments'
+  );
+
+  // 6. Mobile Sticky CTA Bar WhatsApp state:
+  // Unconfirmed placeholder or unconfirmed phone must never produce a broken wa.me URL
+  const unconfirmedDefault = resolveWhatsappCtaState({
+    whatsappNumber: siteContent.contact.whatsappPlaceholder,
+    isPhoneConfirmed: false,
+  });
+  assert.strictEqual(unconfirmedDefault.isAvailable, false);
+  assert.strictEqual(unconfirmedDefault.href, null);
+
+  const unconfirmedWithDigits = resolveWhatsappCtaState({
+    whatsappNumber: '+91 98765 43210',
+    isPhoneConfirmed: false,
+  });
+  assert.strictEqual(unconfirmedWithDigits.isAvailable, false);
+  assert.strictEqual(unconfirmedWithDigits.href, null);
+
+  const confirmedWhatsapp = resolveWhatsappCtaState({
+    whatsappNumber: '+91 (987) 654-3210',
+    isPhoneConfirmed: true,
+  });
+  assert.strictEqual(confirmedWhatsapp.isAvailable, true);
+  assert.strictEqual(confirmedWhatsapp.digitsOnlyPhone, '919876543210');
+  assert.strictEqual(
+    confirmedWhatsapp.href,
+    `https://wa.me/919876543210?text=${encodeURIComponent(WHATSAPP_PREFILLED_MESSAGE)}`
+  );
+}
+
+/**
+ * Automated tests for the 4-slide homepage hero slideshow, clinical approval filtering,
+ * distinct responsive pointer coordinates, facial feature protection zones, and image assets.
+ */
+async function runHeroSlideshowTests(): Promise<void> {
+  assert.strictEqual(HERO_SLIDES.length, 4, 'Hero slideshow must contain all 4 slides');
+  assert.ok(
+    HERO_AUTOPLAY_INTERVAL_MS >= 5000 && HERO_AUTOPLAY_INTERVAL_MS <= 6000,
+    'Hero autoplay interval must be between 5 and 6 seconds'
+  );
+  assert.ok(
+    HERO_CROSSFADE_DURATION_SEC >= 0.9 && HERO_CROSSFADE_DURATION_SEC <= 1.2,
+    'Hero crossfade duration must be between 0.9s and 1.2s'
+  );
+  assert.ok(
+    HERO_KEN_BURNS_MAX_SCALE <= 1.02,
+    'Hero Ken Burns scale must not exceed 1.02'
+  );
+
+  // 1. All 4 hero slides are approved in siteContent.treatments and active publicly
+  const publicHeroSlides = getApprovedHeroSlides(HERO_SLIDES, siteContent.treatments);
+  assert.strictEqual(
+    publicHeroSlides.length,
+    4,
+    'All 4 hero slides must be active publicly when their treatments are approved_by_clinic'
+  );
+  assert.deepStrictEqual(
+    publicHeroSlides.map((s) => ({
+      slideNumber: s.slideNumber,
+      eyebrow: s.eyebrow,
+      heading: s.heading,
+      route: s.route,
+    })),
+    [
+      {
+        slideNumber: '01',
+        eyebrow: 'FACE · 01',
+        heading: 'Rhinoplasty',
+        route: '/treatments/rhinoplasty',
+      },
+      {
+        slideNumber: '02',
+        eyebrow: 'SKIN · 02',
+        heading: 'Skin Rejuvenation',
+        route: '/treatments/skin-rejuvenation',
+      },
+      {
+        slideNumber: '03',
+        eyebrow: 'HAIR · 03',
+        heading: 'Hair Restoration',
+        route: '/treatments/hair-transplant',
+      },
+      {
+        slideNumber: '04',
+        eyebrow: 'FACE · 04',
+        heading: 'Facial Contouring',
+        route: '/treatments/body-contouring',
+      },
+    ]
+  );
+
+  // 2. If a treatment is marked draft_pending_clinic_approval, its slide is excluded publicly
+  const treatmentsWithSkinDraft = siteContent.treatments.map((t) =>
+    t.slug === 'skin-rejuvenation'
+      ? { ...t, approvalStatus: 'draft_pending_clinic_approval' as const }
+      : t
+  );
+  const filteredSlides = getApprovedHeroSlides(HERO_SLIDES, treatmentsWithSkinDraft);
+  assert.strictEqual(filteredSlides.length, 3);
+  assert.ok(
+    !filteredSlides.some((s) => s.treatmentSlug === 'skin-rejuvenation'),
+    'Draft treatments must never appear as public hero slides'
+  );
+
+  // 3. Verify Slide 01 (Rhinoplasty) hotspot is on the nose (below the eyes) and connector is continuous
+  const slide01 = HERO_SLIDES[0];
+  assert.strictEqual(slide01.id, 'slide-01-rhinoplasty');
+  assert.ok(
+    slide01.imageAnnotation.hotspotV > 0.44 && slide01.imageAnnotation.hotspotV < 0.48,
+    'Rhinoplasty hotspot must be positioned on the nasal tip/sidewall (v ~ 0.458), not the eye (v ~ 0.38)'
+  );
+
+  for (const [vw, vh] of [
+    [1440, 828],
+    [1920, 993],
+    [768, 660],
+  ] as const) {
+    const geom = computeSlideAnnotationGeometry(slide01, vw, vh);
+    assert.strictEqual(geom.showFacialPointer, true, `Facial pointer must be active at ${vw}x${vh}`);
+    assert.ok(
+      geom.labelX < geom.elbowX && geom.elbowX < geom.hotspotX,
+      `Slide 01 connector must route continuously from left negative space (${geom.labelX}) -> elbow (${geom.elbowX}) -> nose hotspot (${geom.hotspotX}) at ${vw}x${vh}`
+    );
+    assert.strictEqual(
+      geom.svgPathD,
+      `M ${geom.labelX} ${geom.labelY} L ${geom.elbowX} ${geom.elbowY} L ${geom.hotspotX} ${geom.hotspotY}`,
+      'SVG path must be a single continuous M -> L -> L path terminating at the exact hotspot coordinate'
+    );
+  }
+
+  const mobileGeom01 = computeSlideAnnotationGeometry(slide01, 390, 660);
+  assert.strictEqual(
+    mobileGeom01.showFacialPointer,
+    false,
+    'Mobile viewport (<640px) must hide the facial pointer and show the compact text-only annotation'
+  );
+
+  // 4. Verify each slide has independent coordinates and never overlaps facial features
+  const desktopPoints = new Set<string>();
+  const tabletPoints = new Set<string>();
+
+  for (const slide of HERO_SLIDES) {
+    const dKey = `${slide.coordinates.desktop.pointX},${slide.coordinates.desktop.pointY}`;
+    const tKey = `${slide.coordinates.tablet.pointX},${slide.coordinates.tablet.pointY}`;
+    desktopPoints.add(dKey);
+    tabletPoints.add(tKey);
+
+    assert.strictEqual(
+      isSlidePointerClearOfFacialFeatures(slide, 'desktop'),
+      true,
+      `Slide ${slide.id} desktop pointer/label must not cover eyebrows, eyes, or lips`
+    );
+    assert.strictEqual(
+      isSlidePointerClearOfFacialFeatures(slide, 'tablet'),
+      true,
+      `Slide ${slide.id} tablet pointer/label must not cover eyebrows, eyes, or lips`
+    );
+    assert.strictEqual(
+      slide.coordinates.mobile.useTextOnlySafeLabel,
+      true,
+      `Slide ${slide.id} must use safe text-only label on narrow mobile viewports`
+    );
+
+    // 5. Verify physical image file exists in /public
+    const publicImgPath = path.join(process.cwd(), 'public', slide.imageSrc.replace(/^\//, ''));
+    assert.strictEqual(
+      fs.existsSync(publicImgPath),
+      true,
+      `Hero slide image must exist on disk: ${publicImgPath}`
+    );
+    if (slide.fallbackImageSrc) {
+      const fallbackImgPath = path.join(
+        process.cwd(),
+        'public',
+        slide.fallbackImageSrc.replace(/^\//, '')
+      );
+      assert.strictEqual(
+        fs.existsSync(fallbackImgPath),
+        true,
+        `Hero slide fallback image must exist on disk: ${fallbackImgPath}`
+      );
+    }
+  }
+
+  assert.strictEqual(
+    desktopPoints.size,
+    4,
+    'Every hero slide must have distinct desktop pointer coordinates'
+  );
+  assert.strictEqual(
+    tabletPoints.size,
+    4,
+    'Every hero slide must have distinct tablet pointer coordinates'
+  );
 }
 
 async function main() {
@@ -946,6 +1257,12 @@ async function main() {
   await runBookingFormAndPublicTreatmentTests();
   console.log(
     'BOOKING_FORM_TESTS: PASS (Demo Mode local validation, Live Mode Firestore flow, local-date & international phone validation, and public draft treatment hiding passed).'
+  );
+
+  // 3. Run Hero Slideshow & Fine-Line Pointer tests
+  await runHeroSlideshowTests();
+  console.log(
+    'HERO_SLIDESHOW_TESTS: PASS (4-slide hero configuration, approved treatment filtering, facial-feature safe zones, and image assets verified).'
   );
 
   // 3. Check if Firebase Rules Emulator is required (in CI / emulators:exec) or reachable

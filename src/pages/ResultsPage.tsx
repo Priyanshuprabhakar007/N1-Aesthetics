@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck, ArrowUpRight, Camera, Lock } from 'lucide-react';
 import { siteContent } from '../content/site';
 import { useCms } from '../context/CmsContext';
@@ -6,11 +6,16 @@ import { Link } from '../lib/router';
 import { Image } from '../components/LuxuryImage';
 import { SectionReveal } from '../components/SectionReveal';
 import { SeoHead } from '../components/SeoHead';
+import { prefersReducedMotion } from '../lib/gsap';
 import styles from '../styles/luxury.module.css';
+
+const RESULTS_HERO_IMAGE_SRC =
+  '/assets/aistudio/4lcTsp6VIpbhCKmmB-e0q2KcuRpd75pZkNWAmOcI8jD-zdjC48Y97WtBMjjvm1JZJHDDftLJyUxm-SwQva6AJ2IQIopiCkL7ovEp_XSQa3PJo6ommu-WveBNRVNvsfBbmqo4QmGpVuNZwF8Er1Dc6lWQp8XneS90uMwmAtl3f_0Zt_47H9LWfBaoKCe2tyrQ_539a367c.jpg';
 
 export function ResultsPage() {
   const { consentedResults } = useCms();
-  const [selectedSlug, setSelectedSlug] = React.useState<string>('all');
+  const [selectedSlug, setSelectedSlug] = useState<string>('all');
+  const [heroImageLoaded, setHeroImageLoaded] = useState(() => prefersReducedMotion());
 
   const categories = [
     { slug: 'all', title: 'All Categories' },
@@ -33,8 +38,37 @@ export function ResultsPage() {
         canonicalPath="/results"
       />
 
-      <section className="bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
-        <div className={styles.containerLuxury}>
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
+        {/* Decorative right-aligned sculptural photography atmosphere */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[45%] select-none"
+        >
+          <img
+            src={RESULTS_HERO_IMAGE_SRC}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            onLoad={() => setHeroImageLoaded(true)}
+            className={`h-full w-full object-cover object-[78%_52%] brightness-[0.84] contrast-[1.04] saturate-[0.86] sepia-[0.06] transition-opacity duration-1000 ease-out motion-reduce:transition-none ${
+              heroImageLoaded
+                ? 'opacity-25 sm:opacity-35 lg:opacity-85'
+                : 'opacity-0'
+            }`}
+          />
+
+          {/* Strong left-to-right dark espresso gradient keeping the left half uncluttered */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#211A17] via-[#211A17]/82 lg:via-[#211A17]/50 to-[#211A17]/22" />
+
+          {/* Subtle top and bottom gradient blending into the section background */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#211A17]/78 via-transparent to-[#30251F]/92" />
+
+          {/* Warm chocolate-brown tonal wash */}
+          <div className="absolute inset-0 bg-[#261C17]/24 mix-blend-multiply" />
+        </div>
+
+        <div className={`${styles.containerLuxury} relative z-10`}>
           <SectionReveal className="max-w-3xl space-y-5">
             <div className="flex items-center gap-4">
               <span className="text-xs uppercase tracking-[0.3em] text-[#E6CDB5]/80 font-medium">

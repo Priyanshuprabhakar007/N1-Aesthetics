@@ -1,13 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowUpRight, BookOpen, CheckCircle2 } from 'lucide-react';
 import { siteContent } from '../content/site';
 import { Link } from '../lib/router';
 import { SectionReveal } from '../components/SectionReveal';
 import { SeoHead } from '../components/SeoHead';
+import { prefersReducedMotion } from '../lib/gsap';
 import styles from '../styles/luxury.module.css';
+
+const RESOURCES_HERO_IMAGE_SRC =
+  '/assets/aistudio/OFaG9oHggGVQf58SANTnYgaE0k0yNSPeVepyUQC63f9KmFAxAwLHnE1eHu9Rf_DdloImIqFkpdKEMo6r-YsLYj7MI-8aSjgVqQCKmYmZzMdlPKjaqeNVxz3H4nJJ9GZ1GUWdoz5JdF-1fyIhajsD7Yq-kuayvxKPWQGEINzLF2neCvo2ZlVM1Sbs_7-9MfCa_988c1439.jpg';
 
 export function BlogPage() {
   const { resourcesBlog } = siteContent;
+  const [heroImageLoaded, setHeroImageLoaded] = useState(() => prefersReducedMotion());
 
   return (
     <>
@@ -17,8 +22,37 @@ export function BlogPage() {
         canonicalPath="/blog"
       />
 
-      <section className="bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
-        <div className={styles.containerLuxury}>
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
+        {/* Seamless right-aligned editorial still-life background (open book, ivory paper & fountain pen on travertine) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[45%] select-none"
+        >
+          <img
+            src={RESOURCES_HERO_IMAGE_SRC}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            onLoad={() => setHeroImageLoaded(true)}
+            className={`h-full w-full object-cover object-[28%_64%] brightness-[0.80] contrast-[1.04] saturate-[0.86] sepia-[0.08] transition-opacity duration-1000 ease-out motion-reduce:transition-none ${
+              heroImageLoaded
+                ? 'opacity-25 sm:opacity-35 lg:opacity-84'
+                : 'opacity-0'
+            }`}
+          />
+
+          {/* Strong left-to-right dark espresso gradient blending smoothly into #211A17 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#211A17] via-[#211A17]/82 lg:via-[#211A17]/48 to-[#211A17]/55" />
+
+          {/* Subtle top and bottom gradient blending into the section background */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#211A17]/78 via-transparent to-[#30251F]/92" />
+
+          {/* Warm espresso/taupe color-grading wash */}
+          <div className="absolute inset-0 bg-[#261C17]/28 mix-blend-multiply" />
+        </div>
+
+        <div className={`${styles.containerLuxury} relative z-10`}>
           <SectionReveal className="max-w-3xl space-y-5">
             <div className="flex items-center gap-4">
               <span className="text-xs uppercase tracking-[0.3em] text-[#E6CDB5]/80 font-medium">

@@ -48,7 +48,7 @@ export function Footer() {
 
   return (
     <footer ref={footerRef} className="bg-[#211A17] text-[#F5EEE8] border-t border-[#E6CDB5]/15">
-      <div className={`${styles.containerLuxury} py-16 lg:py-20`}>
+      <div className={`${styles.containerLuxury} pt-16 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:py-16 lg:py-20`}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-12 pb-14 border-b border-[#E6CDB5]/15">
           {/* Column 1: Brand & Ethical Commitment */}
           <div className="gsap-footer-col lg:col-span-4 space-y-5">

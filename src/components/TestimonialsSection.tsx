@@ -77,15 +77,14 @@ export function TestimonialsSection() {
         },
       });
 
-      // 1. Smooth background-image reveal on the left editorial portrait
+      // 1. Smooth background-image reveal on the left editorial portrait (upright, zero transform inversion)
       tl.fromTo(
         '.gsap-testimonial-bg',
-        { scale: 1.04, opacity: 0 },
+        { opacity: 0 },
         {
-          scale: 1,
           opacity: 0.9,
           duration: 0.95,
-          clearProps: 'transform',
+          clearProps: 'opacity',
         },
         0
       );
@@ -194,16 +193,17 @@ export function TestimonialsSection() {
       {/* LEFT VISUAL AREA: Large close-up beauty/editorial portrait softly blended into the dark chocolate background */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 left-0 w-[62%] sm:w-[46%] lg:w-[36%] z-[1] overflow-hidden"
+        className="pointer-events-none absolute inset-y-0 left-0 w-[58%] sm:w-[44%] lg:w-[35%] z-[1] overflow-hidden"
       >
         <img
           src="/media/treatment-skin-rejuvenation.jpg"
           alt=""
           loading="lazy"
-          className="gsap-testimonial-bg w-full h-full object-cover object-[42%_28%] -scale-x-100 opacity-90 select-none"
+          style={{ transform: 'none' }}
+          className="gsap-testimonial-bg w-full h-full object-cover object-[35%_32%] sm:object-[36%_34%] lg:object-[36%_32%] opacity-90 select-none"
         />
         {/* Smooth horizontal and vertical gradients blending the portrait into #30251F */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#30251F]/10 via-[#30251F]/55 to-[#30251F]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#30251F]/15 via-[#30251F]/60 to-[#30251F]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#30251F]/70 via-transparent to-[#30251F]/40" />
       </div>
 

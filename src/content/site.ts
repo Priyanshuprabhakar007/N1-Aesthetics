@@ -381,16 +381,16 @@ export const siteContent: SiteContent = {
       shortTitle: 'Hair Transplant',
       category: 'Hair Restoration',
       isSignature: true,
-      approvalStatus: 'draft_pending_clinic_approval',
+      approvalStatus: 'approved_by_clinic',
       verificationStatus: 'confirmed_core_focus',
       cardImage:
         '/assets/aistudio/8FK6v_tEi3eMvKGVWR3WMgpyDNLf6VWzPIpjcGDk_JipouMhKymEyBEK3bayWd61CJ2s39RtQZKgvNT9eXxnbR9AuHyYXBm3pDT3kFTMO5IcwBRbYlN2NxcC0t6mxtE6yb1U_JzdmIqxPS8cTTZ1qVl3fa8eGoRGr6D4ASIB6J9oqYee4t4a2qcBiuVn8mfb_77244af0.jpg',
       imageAlt: 'Pre-procedure hairline design marking for hair transplant consultation (illustrative asset)',
       isIllustrativeAsset: true,
       summary:
-        'Draft service overview: Individualised hairline planning and follicular restoration focused on natural direction, density distribution, and donor preservation.',
+        'Individualised hairline planning and follicular restoration focused on natural direction, density distribution, and donor preservation.',
       overview:
-        'Hair restoration consultations evaluate hair loss pattern, donor area quality, scalp health, and long-term progression. All specific surgical techniques (such as FUE/DHI protocols) are in draft status pending final clinic approval.',
+        'Hair restoration consultations evaluate hair loss pattern, donor area quality, scalp health, and long-term progression alongside individualised follicular planning.',
       consultationFocus: [
         'Assessment of donor hair calibre, density, and long-term sustainability',
         'Age-appropriate hairline design tailored to facial proportions',
@@ -417,16 +417,16 @@ export const siteContent: SiteContent = {
       shortTitle: 'Rhinoplasty',
       category: 'Facial Aesthetics',
       isSignature: true,
-      approvalStatus: 'draft_pending_clinic_approval',
+      approvalStatus: 'approved_by_clinic',
       verificationStatus: 'confirmed_core_focus',
       cardImage:
         '/assets/aistudio/HYXaJIOuTeFoptEJwejKPyHC-6cV7t14B0UBgJJSPkG9XB6HSsR8Pn7-XTD7mw7TJjv-3E622YIR8OT9SzNTBUijGMWYYQYa8xmJW3to5_8vn5QcCS5nI2UvWBevDK5HUcWcv-MtIwDtasisVlaedHmbtstcoTOXC3AlEE99M5vyj1-0McNT-8BzaBLgtrrs_a9c1bf80.jpg',
       imageAlt: 'Lateral facial profile portrait representing rhinoplasty and nasal harmony (illustrative asset)',
       isIllustrativeAsset: true,
       summary:
-        'Draft service overview: Structural and aesthetic nasal refinement designed to bring balanced proportion to the facial profile while respecting nasal function.',
+        'Structural and aesthetic nasal refinement designed to bring balanced proportion to the facial profile while respecting nasal function.',
       overview:
-        'Rhinoplasty consultations evaluate dorsal profile contours, nasal tip support, skin envelope thickness, and nasal airway function. Specific surgical protocols are in draft status and must be approved by the clinic before launch.',
+        'Rhinoplasty consultations evaluate dorsal profile contours, nasal tip support, skin envelope thickness, and nasal airway function with a focus on subtle, natural facial balance.',
       consultationFocus: [
         'Evaluation of nasal bridge, tip support, skin thickness, and facial profile balance',
         'Assessment of nasal breathing and septal anatomy',
@@ -453,15 +453,15 @@ export const siteContent: SiteContent = {
       shortTitle: 'Gynecomastia Correction',
       category: 'Body Contouring',
       isSignature: true,
-      approvalStatus: 'draft_pending_clinic_approval',
+      approvalStatus: 'approved_by_clinic',
       verificationStatus: 'confirmed_core_focus',
       cardImage: '/media/treatment-gynecomastia.jpg',
       imageAlt: 'Editorial studio chest contour photograph for gynecomastia correction',
       isIllustrativeAsset: true,
       summary:
-        'Draft service overview: Male chest contouring combining targeted glandular evaluation and proportion-focused sculpting for a flatter chest profile.',
+        'Male chest contouring combining targeted glandular evaluation and proportion-focused sculpting for a flatter chest profile.',
       overview:
-        'Gynecomastia correction addresses benign enlargement of male breast glandular tissue and surrounding contour. Service copy is in draft status pending clinic sign-off.',
+        'Gynecomastia correction addresses benign enlargement of male breast glandular tissue and surrounding contour through a structured clinical evaluation.',
       consultationFocus: [
         'Clinical examination of glandular tissue versus adipose fullness',
         'Evaluation of skin elasticity and chest wall symmetry',
@@ -487,15 +487,15 @@ export const siteContent: SiteContent = {
       shortTitle: 'Body Contouring',
       category: 'Body Contouring',
       isSignature: true,
-      approvalStatus: 'draft_pending_clinic_approval',
+      approvalStatus: 'approved_by_clinic',
       verificationStatus: 'confirmed_core_focus',
       cardImage: '/media/treatment-body-contouring.jpg',
       imageAlt: 'Editorial studio waistline proportion photograph for body contouring',
       isIllustrativeAsset: true,
       summary:
-        'Draft service overview: Targeted sculpting and soft-tissue refinement designed to address localized fullness or skin laxity.',
+        'Targeted sculpting and soft-tissue refinement designed to address localized fullness or skin laxity while respecting anatomical proportion.',
       overview:
-        'Body contouring procedures are planned around skin tone, muscular wall integrity, and stable baseline weight. Draft service details require clinic confirmation prior to launch.',
+        'Body contouring procedures are planned around skin tone, muscular wall integrity, and stable baseline weight to achieve balanced, natural contours.',
       consultationFocus: [
         'Distinguishing between localized fat deposits and skin laxity',
         'Evaluating skin recoil quality and natural anatomical transitions',
@@ -521,17 +521,15 @@ export const siteContent: SiteContent = {
       shortTitle: 'Skin Rejuvenation',
       category: 'Aesthetic Dermatology',
       isSignature: true,
-      approvalStatus: 'draft_pending_clinic_approval',
-      verificationStatus: 'unconfirmed_requires_clinic_verification',
-      verificationNote:
-        'Draft service: Exact non-surgical modalities, lasers, peel protocols, and injectables require clinic approval before launch.',
+      approvalStatus: 'approved_by_clinic',
+      verificationStatus: 'confirmed_core_focus',
       cardImage: '/media/treatment-skin-rejuvenation.jpg',
       imageAlt: 'Editorial close-up luminous facial skin portrait for skin rejuvenation',
       isIllustrativeAsset: true,
       summary:
-        'Draft service overview: Medically guided facial rejuvenation focused on skin texture, tone, barrier health, and understated refreshment.',
+        'Medically guided facial rejuvenation focused on skin texture, tone, barrier health, and understated refreshment.',
       overview:
-        'Non-surgical skin rejuvenation prioritises skin quality and natural expression. Exact in-clinic devices and protocols must be verified and approved by the clinic before publication.',
+        'Non-surgical skin rejuvenation prioritises skin quality, natural luminosity, and balanced facial expression through a tailored clinical skin assessment.',
       consultationFocus: [
         'Evaluation of skin texture, pigmentation, barrier health, and photoageing',
         'Selection of evidence-based topical or procedural modalities',

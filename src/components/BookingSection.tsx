@@ -74,7 +74,9 @@ export function BookingSection({
     name: '',
     phone: '',
     email: '',
-    treatment: resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments),
+    treatment: isModal
+      ? GENERAL_CONSULTATION_OPTION.value
+      : resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments),
     preferredDate: '',
     message: '',
     privacyConsent: false,
@@ -82,6 +84,14 @@ export function BookingSection({
   }));
 
   useEffect(() => {
+    if (isModal) {
+      setForm((prev) =>
+        prev.treatment === GENERAL_CONSULTATION_OPTION.value
+          ? prev
+          : { ...prev, treatment: GENERAL_CONSULTATION_OPTION.value }
+      );
+      return;
+    }
     const resolved = resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments);
     if (resolved) {
       setForm((prev) => ({ ...prev, treatment: resolved }));
@@ -92,7 +102,7 @@ export function BookingSection({
     ) {
       setForm((prev) => ({ ...prev, treatment: '' }));
     }
-  }, [preselectedTreatment, approvedTreatments]);
+  }, [isModal, preselectedTreatment, approvedTreatments]);
 
   const [errors, setErrors] = useState<BookingFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -191,7 +201,9 @@ export function BookingSection({
       return;
     }
 
-    const validationErrors = validateBookingForm(form, approvedTreatments);
+    const validationErrors = validateBookingForm(form, approvedTreatments, new Date(), {
+      isSimplifiedPopup: isModal,
+    });
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
@@ -200,11 +212,14 @@ export function BookingSection({
     }
 
     const cleanedPhone = form.phone.replace(/[\s().-]/g, '');
+    const effectiveTreatment = isModal
+      ? GENERAL_CONSULTATION_OPTION.value
+      : form.treatment.trim();
     const submissionFingerprint = [
       settings.bookingLiveMode ? 'live' : 'demo',
       form.name.trim().toLowerCase(),
       cleanedPhone,
-      form.treatment.trim(),
+      effectiveTreatment,
       form.preferredDate.trim(),
     ].join('|');
 
@@ -243,6 +258,7 @@ export function BookingSection({
         bookingLiveMode: settings.bookingLiveMode,
         approvedTreatments,
         submitEnquiryToCms,
+        isSimplifiedPopup: isModal,
       });
 
       setErrors(result.validationErrors);
@@ -275,21 +291,21 @@ export function BookingSection({
       id={isModal ? undefined : 'book-consultation'}
       className={`${
         isModal
-          ? 'bg-[#F5EEE8] p-5 sm:p-7 lg:p-8'
+          ? 'bg-[#F5EEE8] p-5 sm:p-6 lg:p-7'
           : 'bg-[#FAF5F0] border border-[#30251F]/12 rounded-[24px] p-5 sm:p-8 lg:p-9 shadow-sm h-full'
       } flex flex-col justify-between`}
     >
       <div>
         <div
           className={`flex flex-wrap items-start justify-between gap-2 ${
-            isModal ? 'mb-4 pr-10 sm:pr-12 border-b border-[#30251F]/10 pb-3.5' : 'mb-5'
+            isModal ? 'mb-3.5 pr-10 sm:pr-12 border-b border-[#30251F]/10 pb-3' : 'mb-5'
           }`}
         >
           <div>
             <h2
               id={headingId}
               className={`${styles.sectionHeading} text-[#211A17] ${
-                isModal ? '!text-[26px] sm:!text-[32px] !leading-[1.15]' : '!text-3xl sm:!text-[34px]'
+                isModal ? '!text-[25px] sm:!text-[30px] !leading-[1.15]' : '!text-3xl sm:!text-[34px]'
               }`}
             >
               <span className="editorial-mask-line pb-0.5">
@@ -320,7 +336,7 @@ export function BookingSection({
             />
           </div>
 
-          {/* STAGGERED GROUP 1: Primary Contact & Procedure Selection */}
+          {/* STAGGERED GROUP 1: Primary Contact & Preferred Date */}
           <div className={`gsap-booking-group ${isModal ? 'space-y-3' : 'space-y-3.5'}`}>
             {/* Row 1: Full Name & Phone Number */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -387,47 +403,8 @@ export function BookingSection({
               </div>
             </div>
 
-            {/* Row 2: Procedure of Interest & Preferred Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label
-                  htmlFor={`${idPrefix}booking-treatment`}
-                  className="block text-xs font-medium text-[#211A17] mb-1 px-2"
-                >
-                  Treatment / Procedure *
-                </label>
-                <select
-                  id={`${idPrefix}booking-treatment`}
-                  required
-                  value={form.treatment}
-                  aria-invalid={Boolean(errors.treatment)}
-                  aria-describedby={errors.treatment ? `${idPrefix}booking-treatment-error` : undefined}
-                  onChange={(e) => setForm({ ...form, treatment: e.target.value })}
-                  className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm ${
-                    !form.treatment ? 'text-[#30251F]/70' : 'text-[#211A17]'
-                  } ${errors.treatment ? '!border-red-700' : ''}`}
-                >
-                  <option value="">Select Procedure *</option>
-                  {approvedTreatments.map((t) => (
-                    <option key={t.slug} value={t.slug}>
-                      {t.title}
-                    </option>
-                  ))}
-                  <option value={GENERAL_CONSULTATION_OPTION.value}>
-                    {GENERAL_CONSULTATION_OPTION.label}
-                  </option>
-                </select>
-                {errors.treatment && (
-                  <p
-                    id={`${idPrefix}booking-treatment-error`}
-                    role="alert"
-                    className="mt-1 text-xs text-red-800 px-2"
-                  >
-                    {errors.treatment}
-                  </p>
-                )}
-              </div>
-
+            {/* Row 2: Preferred Consultation Date (full width in modal; paired with Treatment in standalone section) */}
+            {isModal ? (
               <div className="relative">
                 <label
                   htmlFor={`${idPrefix}booking-date`}
@@ -462,13 +439,88 @@ export function BookingSection({
                   </p>
                 )}
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor={`${idPrefix}booking-treatment`}
+                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
+                  >
+                    Treatment / Procedure *
+                  </label>
+                  <select
+                    id={`${idPrefix}booking-treatment`}
+                    required
+                    value={form.treatment}
+                    aria-invalid={Boolean(errors.treatment)}
+                    aria-describedby={errors.treatment ? `${idPrefix}booking-treatment-error` : undefined}
+                    onChange={(e) => setForm({ ...form, treatment: e.target.value })}
+                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm ${
+                      !form.treatment ? 'text-[#30251F]/70' : 'text-[#211A17]'
+                    } ${errors.treatment ? '!border-red-700' : ''}`}
+                  >
+                    <option value="">Select Procedure *</option>
+                    {approvedTreatments.map((t) => (
+                      <option key={t.slug} value={t.slug}>
+                        {t.title}
+                      </option>
+                    ))}
+                    <option value={GENERAL_CONSULTATION_OPTION.value}>
+                      {GENERAL_CONSULTATION_OPTION.label}
+                    </option>
+                  </select>
+                  {errors.treatment && (
+                    <p
+                      id={`${idPrefix}booking-treatment-error`}
+                      role="alert"
+                      className="mt-1 text-xs text-red-800 px-2"
+                    >
+                      {errors.treatment}
+                    </p>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <label
+                    htmlFor={`${idPrefix}booking-date`}
+                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
+                  >
+                    Preferred Consultation Date *
+                  </label>
+                  <input
+                    id={`${idPrefix}booking-date`}
+                    type="date"
+                    required
+                    min={minDateString}
+                    value={form.preferredDate}
+                    aria-invalid={Boolean(errors.preferredDate)}
+                    aria-describedby={errors.preferredDate ? `${idPrefix}booking-date-error` : undefined}
+                    onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
+                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm text-[#211A17] ${
+                      errors.preferredDate ? '!border-red-700' : ''
+                    }`}
+                  />
+                  <Calendar
+                    className="w-4 h-4 text-[#30251F]/60 pointer-events-none absolute right-4 top-8.5 hidden sm:block"
+                    aria-hidden="true"
+                  />
+                  {errors.preferredDate && (
+                    <p
+                      id={`${idPrefix}booking-date-error`}
+                      role="alert"
+                      className="mt-1 text-xs text-red-800 px-2"
+                    >
+                      {errors.preferredDate}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* STAGGERED GROUP 2: Optional Details, Consent & Submit */}
+          {/* STAGGERED GROUP 2: Consent & Submit (Optional Email/Message omitted in modal and compact mode) */}
           <div className={`gsap-booking-group ${isModal ? 'space-y-3' : 'space-y-3.5'}`}>
-            {/* Row 3: Optional Email & Optional Message */}
-            {!compact && (
+            {!compact && !isModal && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label

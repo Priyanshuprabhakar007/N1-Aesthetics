@@ -19,6 +19,7 @@ import { BlogPage } from './pages/BlogPage';
 import { ContactPage } from './pages/ContactPage';
 import { AdminPage } from './pages/AdminPage';
 import { ConsultationModalProvider } from './components/ConsultationModal';
+import { MobileStickyCtaBar } from './components/MobileStickyCtaBar';
 import { gsap, ScrollTrigger, prefersReducedMotion } from './lib/gsap';
 
 function AppRoutes() {
@@ -107,6 +108,7 @@ export default function App() {
             </main>
 
             <Footer />
+            <MobileStickyCtaBar />
           </div>
         </ConsultationModalProvider>
       </RouterProvider>

@@ -155,13 +155,17 @@ export function normalizePhoneForSubmission(phoneStr: string): string {
 
 /**
  * Pure validation function for the consultation form.
+ * When `isSimplifiedPopup` is true, `treatment`, `email`, and `message` are omitted from UI
+ * and `treatment` defaults internally to `'general-consultation'`.
  */
 export function validateBookingForm(
   form: BookingFormState,
   approvedTreatments?: readonly Pick<TreatmentItem, 'slug' | 'approvalStatus'>[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  options?: { isSimplifiedPopup?: boolean }
 ): BookingFormErrors {
   const nextErrors: BookingFormErrors = {};
+  const isSimplifiedPopup = Boolean(options?.isSimplifiedPopup);
 
   if (!form.name.trim() || form.name.trim().length < 2) {
     nextErrors.name = 'Please enter your full name (at least 2 characters).';
@@ -174,32 +178,35 @@ export function validateBookingForm(
       'Please enter a valid contact phone number (7 to 15 digits, international formats supported).';
   }
 
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    nextErrors.email = 'Please enter a valid email address or leave this optional field blank.';
-  }
+  if (!isSimplifiedPopup) {
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = 'Please enter a valid email address or leave this optional field blank.';
+    }
 
-  const trimmedTreatment = form.treatment.trim();
-  if (!trimmedTreatment) {
-    nextErrors.treatment = 'Please select a procedure or consultation area.';
-  } else if (approvedTreatments) {
-    const isAllowed =
-      trimmedTreatment === GENERAL_CONSULTATION_OPTION.value ||
-      approvedTreatments.some(
-        (t) => t.slug === trimmedTreatment && t.approvalStatus === 'approved_by_clinic'
-      );
-    if (!isAllowed) {
-      nextErrors.treatment = 'Please select an approved procedure or General Aesthetic Consultation.';
+    const trimmedTreatment = form.treatment.trim();
+    if (!trimmedTreatment) {
+      nextErrors.treatment = 'Please select a procedure or consultation area.';
+    } else if (approvedTreatments) {
+      const isAllowed =
+        trimmedTreatment === GENERAL_CONSULTATION_OPTION.value ||
+        approvedTreatments.some(
+          (t) => t.slug === trimmedTreatment && t.approvalStatus === 'approved_by_clinic'
+        );
+      if (!isAllowed) {
+        nextErrors.treatment =
+          'Please select an approved procedure or General Aesthetic Consultation.';
+      }
+    }
+
+    if (form.message.trim().length > 500) {
+      nextErrors.message =
+        'Please keep your note concise (under 500 characters) and omit medical history.';
     }
   }
 
   const dateValidation = validatePreferredDate(form.preferredDate, now);
   if (!dateValidation.valid) {
     nextErrors.preferredDate = dateValidation.error;
-  }
-
-  if (form.message.trim().length > 500) {
-    nextErrors.message =
-      'Please keep your note concise (under 500 characters) and omit medical history.';
   }
 
   if (!form.privacyConsent) {
@@ -226,6 +233,7 @@ export interface ProcessBookingSubmissionParams {
   fetchImpl?: typeof fetch;
   endpoint?: string;
   now?: Date;
+  isSimplifiedPopup?: boolean;
 }
 
 export interface ProcessBookingSubmissionResult {
@@ -246,8 +254,20 @@ export async function processBookingSubmission({
   fetchImpl = typeof fetch !== 'undefined' ? fetch : undefined,
   endpoint = siteContent.bookingConfig.endpoint,
   now = new Date(),
+  isSimplifiedPopup = false,
 }: ProcessBookingSubmissionParams): Promise<ProcessBookingSubmissionResult> {
-  const validationErrors = validateBookingForm(form, approvedTreatments, now);
+  const effectiveForm: BookingFormState = isSimplifiedPopup
+    ? {
+        ...form,
+        treatment: GENERAL_CONSULTATION_OPTION.value,
+        email: '',
+        message: '',
+      }
+    : form;
+
+  const validationErrors = validateBookingForm(effectiveForm, approvedTreatments, now, {
+    isSimplifiedPopup,
+  });
   if (Object.keys(validationErrors).length > 0) {
     return {
       ok: false,
@@ -257,7 +277,7 @@ export async function processBookingSubmission({
   }
 
   // Honeypot check: silently return Demo Mode notice without network or DB writes
-  if (form.website_url.trim().length > 0) {
+  if (effectiveForm.website_url.trim().length > 0) {
     return {
       ok: true,
       validationErrors: {},
@@ -284,17 +304,18 @@ export async function processBookingSubmission({
 
   // LIVE BOOKING MODE:
   // Step 1: Save live enquiry to Firebase Firestore (source of truth).
-  const normalizedPhone = normalizePhoneForSubmission(form.phone);
+  const normalizedPhone = normalizePhoneForSubmission(effectiveForm.phone);
+  const resolvedTreatment = effectiveForm.treatment.trim() || GENERAL_CONSULTATION_OPTION.value;
   let createdEnquiryId = '';
   try {
     createdEnquiryId = await submitEnquiryToCms({
-      name: form.name.trim(),
+      name: effectiveForm.name.trim(),
       phone: normalizedPhone,
-      email: form.email.trim() || undefined,
-      treatment: form.treatment.trim(),
-      preferredDate: form.preferredDate.trim(),
-      message: form.message.trim() || undefined,
-      privacyConsent: form.privacyConsent,
+      email: isSimplifiedPopup ? undefined : effectiveForm.email.trim() || undefined,
+      treatment: resolvedTreatment,
+      preferredDate: effectiveForm.preferredDate.trim(),
+      message: isSimplifiedPopup ? undefined : effectiveForm.message.trim() || undefined,
+      privacyConsent: effectiveForm.privacyConsent,
     });
   } catch {
     return {
@@ -325,14 +346,14 @@ export async function processBookingSubmission({
 
   const requestBody = {
     enquiryId: createdEnquiryId,
-    name: form.name.trim(),
+    name: effectiveForm.name.trim(),
     phone: normalizedPhone,
-    email: form.email.trim() || undefined,
-    treatment: form.treatment.trim(),
-    preferredDate: form.preferredDate.trim(),
-    message: form.message.trim() || undefined,
-    privacyConsent: form.privacyConsent,
-    website_url: form.website_url,
+    email: isSimplifiedPopup ? undefined : effectiveForm.email.trim() || undefined,
+    treatment: resolvedTreatment,
+    preferredDate: effectiveForm.preferredDate.trim(),
+    message: isSimplifiedPopup ? undefined : effectiveForm.message.trim() || undefined,
+    privacyConsent: effectiveForm.privacyConsent,
+    website_url: effectiveForm.website_url,
     liveMode: true,
   };
 

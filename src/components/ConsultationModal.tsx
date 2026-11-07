@@ -42,7 +42,6 @@ export function ConsultationModalProvider({ children }: { children: React.ReactN
   const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [preselectedTreatment, setPreselectedTreatment] = useState<string>('');
 
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -60,18 +59,12 @@ export function ConsultationModalProvider({ children }: { children: React.ReactN
   }, []);
 
   const openConsultationForm = useCallback(
-    (treatmentSlug = '') => {
+    (_treatmentSlug = '') => {
       captureTriggerFocus();
       markPopupShownInSession();
-      if (treatmentSlug) {
-        setPreselectedTreatment(treatmentSlug);
-      } else if (normalizedPath.startsWith('/treatments/')) {
-        const currentSlug = normalizedPath.replace('/treatments/', '');
-        if (currentSlug) setPreselectedTreatment(currentSlug);
-      }
       setIsOpen(true);
     },
-    [captureTriggerFocus, normalizedPath]
+    [captureTriggerFocus]
   );
 
   const closeModal = useCallback(() => {
@@ -280,13 +273,13 @@ export function ConsultationModalProvider({ children }: { children: React.ReactN
             className="fixed inset-0 bg-[#211A17]/72 backdrop-blur-[4px]"
           />
 
-          {/* SINGLE CONSULTATION FORM MODAL (650–760px desktop width, warm ivory #F5EEE8) */}
+          {/* SINGLE CONSULTATION FORM MODAL (compact luxury warm ivory #F5EEE8) */}
           <div
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="n7-consultation-form-modal-title"
-            className="relative z-10 w-full max-w-[720px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain rounded-[26px] bg-[#F5EEE8] border border-[#E6CDB5]/65 shadow-[0_28px_80px_rgba(15,10,8,0.58)]"
+            className="relative z-10 w-full max-w-[620px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain rounded-[26px] bg-[#F5EEE8] border border-[#E6CDB5]/65 shadow-[0_28px_80px_rgba(15,10,8,0.58)]"
           >
             {/* Visible top-right Close (X) button */}
             <button
@@ -294,7 +287,7 @@ export function ConsultationModalProvider({ children }: { children: React.ReactN
               type="button"
               onClick={closeModal}
               aria-label="Close consultation booking form"
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full border border-[#30251F]/18 bg-[#FAF5F0] text-[#211A17] hover:bg-[#E6CDB5]/55 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#211A17]"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full border border-[#30251F]/18 bg-[#FAF5F0] text-[#211A17] hover:bg-[#E6CDB5]/55 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#211A17]"
             >
               <X className="w-4 h-4 stroke-[1.75]" />
             </button>
@@ -302,7 +295,6 @@ export function ConsultationModalProvider({ children }: { children: React.ReactN
             <BookingSection
               isModal
               headingId="n7-consultation-form-modal-title"
-              preselectedTreatment={preselectedTreatment}
             />
           </div>
         </div>

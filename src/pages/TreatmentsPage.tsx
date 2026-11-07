@@ -6,11 +6,16 @@ import { Link } from '../lib/router';
 import { Image } from '../components/LuxuryImage';
 import { SectionReveal } from '../components/SectionReveal';
 import { SeoHead } from '../components/SeoHead';
+import { prefersReducedMotion } from '../lib/gsap';
 import styles from '../styles/luxury.module.css';
+
+const TREATMENTS_HERO_IMAGE_SRC =
+  '/assets/aistudio/WAAbfkXCglP5FqhafNVvh-kVnZ6Zh9pqqtbrkoz_0SEs1_37w2l-c2uDsvahWNcfsnJ9v5B6rbMxxQ3cLQJpsieUBOwJmKxuk-SSBmrA0lb0B4Bar1xddC_SPoMQIQviCvCOydUQmCxF70mlsVwgKvRNPUhh7L8aa98dWCTKz0webHfA6p61PV14VBnhz6gG_d1d67589.jpg';
 
 export function TreatmentsPage() {
   const { treatments } = useCms();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [heroImageLoaded, setHeroImageLoaded] = useState(() => prefersReducedMotion());
 
   const approvedTreatments = treatments.filter(
     (t) => t.approvalStatus === 'approved_by_clinic'
@@ -35,8 +40,34 @@ export function TreatmentsPage() {
       />
 
       {/* Dark Luxury Header */}
-      <section className="bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
-        <div className={styles.containerLuxury}>
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#211A17] to-[#30251F] text-[#F5EEE8] py-16 lg:py-24 border-b border-[#E6CDB5]/15">
+        {/* Seamless right-aligned editorial beauty profile background (illustrative campaign atmosphere) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[45%] select-none"
+        >
+          <img
+            src={TREATMENTS_HERO_IMAGE_SRC}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            onLoad={() => setHeroImageLoaded(true)}
+            className={`h-full w-full -scale-x-100 object-cover object-[38%_34%] brightness-[0.88] contrast-[1.03] saturate-[0.94] transition-opacity duration-1000 ease-out motion-reduce:transition-none ${
+              heroImageLoaded
+                ? 'opacity-25 sm:opacity-35 lg:opacity-88'
+                : 'opacity-0'
+            }`}
+          />
+
+          {/* Strong left-to-right dark espresso gradient blending smoothly into #211A17 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#211A17] via-[#211A17]/80 lg:via-[#211A17]/46 to-[#211A17]/20" />
+
+          {/* Subtle top and bottom gradient blending into the section background */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#211A17]/75 via-transparent to-[#30251F]/92" />
+        </div>
+
+        <div className={`${styles.containerLuxury} relative z-10`}>
           <SectionReveal className="max-w-3xl space-y-5">
             <div className="flex items-center gap-4">
               <span className="text-xs uppercase tracking-[0.3em] text-[#E6CDB5]/80 font-medium">
