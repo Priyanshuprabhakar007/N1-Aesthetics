@@ -134,25 +134,32 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Signature Treatments (Drafts until clinic approval) */}
+          {/* Column 3: Signature Treatments (Only clinic-approved treatments shown publicly) */}
           <div className="gsap-footer-col lg:col-span-3 space-y-4">
             <h2 className="text-xs uppercase tracking-[0.22em] text-[#BA9876] font-sans font-medium">
               Signature Treatments
             </h2>
             <ul className="space-y-2.5 text-sm text-[#F5EEE8]/80">
-              {treatments.map((treatment) => (
-                <li key={treatment.slug}>
-                  <Link
-                    href={`/treatments/${treatment.slug}`}
-                    className="editorial-footer-link hover:text-[#E6CDB5] transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <span>{treatment.shortTitle}</span>
-                    {treatment.approvalStatus === 'draft_pending_clinic_approval' && (
-                      <span className="text-[11px] text-[#BA9876]/85">(Draft)</span>
-                    )}
-                  </Link>
-                </li>
-              ))}
+              {treatments
+                .filter((treatment) => treatment.approvalStatus === 'approved_by_clinic')
+                .map((treatment) => (
+                  <li key={treatment.slug}>
+                    <Link
+                      href={`/treatments/${treatment.slug}`}
+                      className="editorial-footer-link hover:text-[#E6CDB5] transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <span>{treatment.shortTitle}</span>
+                    </Link>
+                  </li>
+                ))}
+              <li>
+                <Link
+                  href="/contact#book-consultation"
+                  className="editorial-footer-link hover:text-[#E6CDB5] transition-colors inline-flex items-center gap-1.5"
+                >
+                  <span>General Aesthetic Consultation</span>
+                </Link>
+              </li>
             </ul>
           </div>
 

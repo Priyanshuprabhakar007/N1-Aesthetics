@@ -28,6 +28,19 @@ import handler, {
   type VerifiedFirestoreEnquiryRecord,
   type IdempotencyAcquireResult,
 } from './api/appointments';
+import {
+  DEMO_MODE_SUCCESS_MESSAGE,
+  GENERAL_CONSULTATION_OPTION,
+  getPublicApprovedTreatments,
+  getPublicBookingOptions,
+  resolveInitialBookingTreatment,
+  getLocalTodayDateString,
+  validatePreferredDate,
+  validatePhoneFormat,
+  validateBookingForm,
+  processBookingSubmission,
+} from './src/lib/bookingValidation';
+import { siteContent, type TreatmentItem } from './src/content/site';
 
 // Always use an offline demo-* project ID for emulator tests so tests never connect to production Firebase
 const EMULATOR_PROJECT_ID = process.env.GCLOUD_PROJECT?.startsWith('demo-')
@@ -724,6 +737,204 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   resetAppointmentAbuseCachesForTest();
 }
 
+/**
+ * Automated tests for Demo Mode submission, Live Mode submission, form validation,
+ * local-date handling, international phone formats, and public draft vs approved treatments.
+ */
+async function runBookingFormAndPublicTreatmentTests(): Promise<void> {
+  const fixedNow = new Date(2026, 10, 6, 21, 30, 0); // Local: 2026-11-06 21:30:00
+  const todayLocalStr = getLocalTodayDateString(fixedNow);
+  assert.strictEqual(todayLocalStr, '2026-11-06');
+
+  const sampleTreatments: TreatmentItem[] = [
+    {
+      ...siteContent.treatments[0],
+      slug: 'hair-transplant',
+      title: 'Hair Transplant',
+      approvalStatus: 'draft_pending_clinic_approval',
+    },
+    {
+      ...siteContent.treatments[1],
+      slug: 'rhinoplasty',
+      title: 'Rhinoplasty',
+      approvalStatus: 'approved_by_clinic',
+    },
+  ];
+
+  // 1. Draft treatments are hidden publicly; approved treatments & General Aesthetic Consultation remain selectable
+  const approvedList = getPublicApprovedTreatments(sampleTreatments);
+  assert.strictEqual(approvedList.length, 1);
+  assert.strictEqual(approvedList[0].slug, 'rhinoplasty');
+
+  const dropdownOptions = getPublicBookingOptions(sampleTreatments);
+  assert.deepStrictEqual(dropdownOptions, [
+    { value: 'rhinoplasty', label: 'Rhinoplasty' },
+    { value: 'general-consultation', label: 'General Aesthetic Consultation' },
+  ]);
+  assert.ok(
+    !dropdownOptions.some((o) => o.label.includes('Draft') || o.value === 'hair-transplant'),
+    'Draft treatments must never appear in public booking options'
+  );
+
+  // Preselected treatment preservation: approved and general-consultation preserved, draft rejected
+  assert.strictEqual(resolveInitialBookingTreatment('rhinoplasty', sampleTreatments), 'rhinoplasty');
+  assert.strictEqual(
+    resolveInitialBookingTreatment('general-consultation', sampleTreatments),
+    'general-consultation'
+  );
+  assert.strictEqual(
+    resolveInitialBookingTreatment('hair-transplant', sampleTreatments),
+    '',
+    'Draft treatment must not be preselected on public forms'
+  );
+
+  // When all treatments are drafts, General Aesthetic Consultation is still available
+  const allDraftOptions = getPublicBookingOptions(siteContent.treatments);
+  assert.deepStrictEqual(allDraftOptions, [
+    {
+      value: GENERAL_CONSULTATION_OPTION.value,
+      label: GENERAL_CONSULTATION_OPTION.label,
+    },
+  ]);
+
+  // 2. Demo Mode does NOT call /api/appointments and does NOT write to Firestore, and shows the exact Demo Mode notice
+  let demoFirestoreCalls = 0;
+  let demoApiCalls = 0;
+  const demoResult = await processBookingSubmission({
+    form: {
+      name: 'Ananya Singh',
+      phone: '+91 98765 43210',
+      email: 'ananya@example.com',
+      treatment: 'rhinoplasty',
+      preferredDate: '2026-11-15',
+      message: 'Morning slot preferred',
+      privacyConsent: true,
+      website_url: '',
+    },
+    bookingLiveMode: false,
+    approvedTreatments: approvedList,
+    submitEnquiryToCms: async () => {
+      demoFirestoreCalls += 1;
+      return 'enq_should_not_be_created';
+    },
+    fetchImpl: (async () => {
+      demoApiCalls += 1;
+      throw new Error('/api/appointments must not be called in Demo Mode');
+    }) as typeof fetch,
+    now: fixedNow,
+  });
+
+  assert.strictEqual(demoResult.ok, true);
+  assert.strictEqual(demoFirestoreCalls, 0, 'Demo Mode must not write any enquiry to Firestore');
+  assert.strictEqual(demoApiCalls, 0, 'Demo Mode must not call /api/appointments');
+  assert.strictEqual(demoResult.serverResponse.status, 'demo_mode');
+  assert.strictEqual(
+    demoResult.serverResponse.message,
+    'Your consultation request passed validation. Live booking is not yet enabled. No enquiry has been sent or appointment booked.'
+  );
+  assert.strictEqual(demoResult.serverResponse.message, DEMO_MODE_SUCCESS_MESSAGE);
+
+  // 3. Invalid form fields show field-specific errors and do not call Firestore or API
+  const invalidErrors = validateBookingForm(
+    {
+      name: 'A',
+      phone: '123',
+      email: 'invalid-email',
+      treatment: '',
+      preferredDate: '2026-11-05', // Yesterday in local time
+      message: 'x'.repeat(501),
+      privacyConsent: false,
+      website_url: '',
+    },
+    approvedList,
+    fixedNow
+  );
+  assert.ok(invalidErrors.name, 'Short name must produce name error');
+  assert.ok(invalidErrors.phone, 'Invalid phone must produce phone error');
+  assert.ok(invalidErrors.email, 'Invalid email must produce email error');
+  assert.ok(invalidErrors.treatment, 'Empty treatment must produce treatment error');
+  assert.strictEqual(
+    invalidErrors.preferredDate,
+    'Preferred consultation date cannot be in the past.'
+  );
+  assert.ok(invalidErrors.message, 'Message over 500 chars must produce message error');
+  assert.ok(invalidErrors.privacyConsent, 'Unchecked privacyConsent must produce consent error');
+
+  // Unapproved draft treatment slug submitted directly must fail validation
+  const draftTreatmentAttempt = validateBookingForm(
+    {
+      name: 'Ananya Singh',
+      phone: '+91 98765 43210',
+      email: '',
+      treatment: 'hair-transplant',
+      preferredDate: '2026-11-06',
+      message: '',
+      privacyConsent: true,
+      website_url: '',
+    },
+    approvedList,
+    fixedNow
+  );
+  assert.ok(draftTreatmentAttempt.treatment, 'Submitting a draft treatment slug must fail validation');
+
+  // Invalid calendar rollover dates (e.g. Feb 30) and today local date handling
+  assert.strictEqual(validatePreferredDate('2026-02-30', fixedNow).valid, false);
+  assert.strictEqual(validatePreferredDate('not-a-date', fixedNow).valid, false);
+  assert.strictEqual(validatePreferredDate('2026-11-06', fixedNow).valid, true);
+
+  // International phone formats
+  assert.strictEqual(validatePhoneFormat('+91 98765 43210'), true);
+  assert.strictEqual(validatePhoneFormat('+1 (415) 555-0199'), true);
+  assert.strictEqual(validatePhoneFormat('+44-20-7946-0958'), true);
+  assert.strictEqual(validatePhoneFormat('+61.2.9374.4000'), true);
+  assert.strictEqual(validatePhoneFormat('abc-def-ghij'), false);
+
+  // 4. Live Mode uses secured Firestore submission first, then calls /api/appointments,
+  // and if notification returns 503, reports accurate saved status (never a validation error)
+  let liveFirestorePayload: any = null;
+  let liveApiRequestBody: any = null;
+  const liveResult503 = await processBookingSubmission({
+    form: {
+      name: 'Rohan Mehta',
+      phone: '+1 (415) 555-0199',
+      email: 'rohan@example.com',
+      treatment: 'rhinoplasty',
+      preferredDate: '2026-11-20',
+      message: 'Afternoon preferred',
+      privacyConsent: true,
+      website_url: '',
+    },
+    bookingLiveMode: true,
+    approvedTreatments: approvedList,
+    submitEnquiryToCms: async (payload) => {
+      liveFirestorePayload = payload;
+      return 'enq_1762380000000_live01';
+    },
+    fetchImpl: (async (_url: any, init: any) => {
+      liveApiRequestBody = JSON.parse(String(init.body));
+      return {
+        ok: false,
+        status: 503,
+        async json() {
+          return { ok: false, mode: 'service_unavailable' };
+        },
+      } as Response;
+    }) as typeof fetch,
+    now: fixedNow,
+  });
+
+  assert.strictEqual(liveResult503.ok, true);
+  assert.ok(liveFirestorePayload, 'Live Mode must save enquiry to Firestore via submitEnquiryToCms');
+  assert.strictEqual(liveFirestorePayload.treatment, 'rhinoplasty');
+  assert.strictEqual(liveFirestorePayload.privacyConsent, true);
+  assert.strictEqual(liveApiRequestBody.enquiryId, 'enq_1762380000000_live01');
+  assert.strictEqual(liveResult503.serverResponse.status, 'live_enquiry_logged');
+  assert.strictEqual(
+    liveResult503.serverResponse.title,
+    'Enquiry Saved — Automated Staff Notification Pending'
+  );
+}
+
 async function main() {
   // 1. Run /api/appointments & storage/admin contract tests
   await runAppointmentApiAndContractTests();
@@ -731,7 +942,13 @@ async function main() {
     'API_SECURITY_TESTS: PASS (/api/appointments server-side verification, idempotency, retry, and distributed rate-limit tests passed).'
   );
 
-  // 2. Check if Firebase Rules Emulator is required (in CI / emulators:exec) or reachable
+  // 2. Run Booking Form (Demo Mode, Live Mode, validation, public treatments) tests
+  await runBookingFormAndPublicTreatmentTests();
+  console.log(
+    'BOOKING_FORM_TESTS: PASS (Demo Mode local validation, Live Mode Firestore flow, local-date & international phone validation, and public draft treatment hiding passed).'
+  );
+
+  // 3. Check if Firebase Rules Emulator is required (in CI / emulators:exec) or reachable
   const requireEmulator =
     process.env.REQUIRE_FIREBASE_EMULATOR === 'true' ||
     process.env.GITHUB_ACTIONS === 'true' ||

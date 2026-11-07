@@ -220,7 +220,7 @@ export const siteContent: SiteContent = {
     endpoint: '/api/appointments',
     demoNoticeTitle: 'Demo Mode — Booking Integration Being Configured',
     demoNoticeBody:
-      'Your consultation request passed validation. Because live clinic scheduling is still being configured, this form operates in clearly labelled Demo Mode and does not confirm a booked appointment slot.',
+      'Your consultation request passed validation. Live booking is not yet enabled. No enquiry has been sent or appointment booked.',
   },
   navigation: [
     { label: 'Home', href: '/' },

@@ -15,9 +15,9 @@ interface TreatmentDetailPageProps {
 
 export function TreatmentDetailPage({ slug }: TreatmentDetailPageProps) {
   const { treatments } = useCms();
-  const treatment =
-    treatments.find((t) => t.slug === slug) ||
-    siteContent.treatments.find((t) => t.slug === slug);
+  const treatment = treatments.find(
+    (t) => t.slug === slug && t.approvalStatus === 'approved_by_clinic'
+  );
 
   if (!treatment) {
     return (

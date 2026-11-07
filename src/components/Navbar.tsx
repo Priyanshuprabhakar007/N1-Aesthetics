@@ -205,17 +205,29 @@ export function Navbar() {
                       className="absolute left-0 top-full pt-3 w-64 z-50"
                     >
                       <div className="bg-[#211A17]/98 backdrop-blur-xl border border-[#E6CDB5]/20 rounded-[14px] p-2.5 shadow-2xl">
-                        {treatments.map((treatment) => (
-                          <Link
-                            key={treatment.slug}
-                            href={`/treatments/${treatment.slug}`}
-                            role="menuitem"
-                            className="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs text-[#F5F0E9]/85 hover:bg-[#30251F] hover:text-[#E6CDB5] transition-colors duration-250 group"
-                          >
-                            <span className="whitespace-nowrap truncate">{treatment.shortTitle}</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-[#BA9876] shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                          </Link>
-                        ))}
+                        {treatments
+                          .filter((t) => t.approvalStatus === 'approved_by_clinic')
+                          .map((treatment) => (
+                            <Link
+                              key={treatment.slug}
+                              href={`/treatments/${treatment.slug}`}
+                              role="menuitem"
+                              className="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs text-[#F5F0E9]/85 hover:bg-[#30251F] hover:text-[#E6CDB5] transition-colors duration-250 group"
+                            >
+                              <span className="whitespace-nowrap truncate">
+                                {treatment.shortTitle}
+                              </span>
+                              <ArrowUpRight className="w-3.5 h-3.5 text-[#BA9876] shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                            </Link>
+                          ))}
+                        <Link
+                          href="/treatments"
+                          role="menuitem"
+                          className="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs text-[#F5F0E9]/85 hover:bg-[#30251F] hover:text-[#E6CDB5] transition-colors duration-250 group"
+                        >
+                          <span className="whitespace-nowrap truncate">All Procedures</span>
+                          <ArrowUpRight className="w-3.5 h-3.5 text-[#BA9876] shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </Link>
                         <div className="my-1.5 border-t border-[#E6CDB5]/12" />
                         <Link
                           href="/doctor"

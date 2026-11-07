@@ -144,7 +144,9 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<StaffRoleType>(null);
 
   const [settings, setSettings] = useState<LiveSiteSettings>(defaultSettings);
-  const [treatments, setTreatments] = useState<TreatmentItem[]>(siteContent.treatments);
+  const [treatments, setTreatments] = useState<TreatmentItem[]>(() =>
+    siteContent.treatments.filter((t) => t.approvalStatus === 'approved_by_clinic')
+  );
   const [consentedTestimonials, setConsentedTestimonials] = useState<ConsentedTestimonial[]>(
     siteContent.testimonialsSection.consentedTestimonials
   );
@@ -336,10 +338,13 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 3. Treatments listener:
-  // - Public / unauthenticated visitors query ONLY `approvalStatus == 'approved_by_clinic'`
-  // - Verified staff (admin / editor) query both `draft_pending_clinic_approval` and `approved_by_clinic`
+  // - Public / unauthenticated visitors receive ONLY `approvalStatus == 'approved_by_clinic'` (never static drafts)
+  // - Verified staff (admin / editor) receive both `draft_pending_clinic_approval` and `approved_by_clinic`
   useEffect(() => {
     const isVerifiedStaff = authReady && (role === 'admin' || role === 'editor');
+    const approvedStaticTreatments = siteContent.treatments.filter(
+      (t) => t.approvalStatus === 'approved_by_clinic'
+    );
 
     const qTreatments = isVerifiedStaff
       ? query(
@@ -392,19 +397,28 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
             } satisfies TreatmentItem;
           });
 
-          const bySlug = new Map(dbDocs.map((item) => [item.slug, item]));
-          const mergedBase = siteContent.treatments.map(
-            (staticItem) => bySlug.get(staticItem.slug) || staticItem
-          );
-          const customDocs = dbDocs.filter(
-            (item) => !siteContent.treatments.some((s) => s.slug === item.slug)
-          );
-          setTreatments([...mergedBase, ...customDocs]);
+          if (isVerifiedStaff) {
+            const bySlug = new Map(dbDocs.map((item) => [item.slug, item]));
+            const mergedBase = siteContent.treatments.map(
+              (staticItem) => bySlug.get(staticItem.slug) || staticItem
+            );
+            const customDocs = dbDocs.filter(
+              (item) => !siteContent.treatments.some((s) => s.slug === item.slug)
+            );
+            setTreatments([...mergedBase, ...customDocs]);
+          } else {
+            const approvedOnly = dbDocs.filter(
+              (item) => item.approvalStatus === 'approved_by_clinic'
+            );
+            setTreatments(approvedOnly);
+          }
         } else {
-          setTreatments(siteContent.treatments);
+          setTreatments(isVerifiedStaff ? siteContent.treatments : approvedStaticTreatments);
         }
       },
-      () => {}
+      () => {
+        setTreatments(isVerifiedStaff ? siteContent.treatments : approvedStaticTreatments);
+      }
     );
 
     return () => {

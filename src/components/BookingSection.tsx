@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Calendar,
@@ -8,32 +8,44 @@ import {
   Phone,
   MessageCircle,
 } from 'lucide-react';
-import { siteContent } from '../content/site';
 import { useCms } from '../context/CmsContext';
 import { gsap, prefersReducedMotion } from '../lib/gsap';
+import {
+  type BookingFormState,
+  type BookingFormErrors,
+  type BookingServerResponse,
+  DEMO_MODE_SUCCESS_TITLE,
+  DEMO_MODE_SUCCESS_MESSAGE,
+  GENERAL_CONSULTATION_OPTION,
+  getPublicApprovedTreatments,
+  getPublicBookingOptions,
+  resolveInitialBookingTreatment,
+  getLocalTodayDateString,
+  validatePreferredDate,
+  validatePhoneFormat,
+  normalizePhoneForSubmission,
+  validateBookingForm,
+  processBookingSubmission,
+} from '../lib/bookingValidation';
 import styles from '../styles/luxury.module.css';
 
-interface BookingFormState {
-  name: string;
-  phone: string;
-  email: string;
-  treatment: string;
-  preferredDate: string;
-  message: string;
-  privacyConsent: boolean;
-  /** Honeypot field: must remain empty */
-  website_url: string;
-}
-
-interface BookingFormErrors {
-  name?: string;
-  phone?: string;
-  email?: string;
-  treatment?: string;
-  preferredDate?: string;
-  message?: string;
-  privacyConsent?: string;
-}
+export {
+  type BookingFormState,
+  type BookingFormErrors,
+  type BookingServerResponse,
+  DEMO_MODE_SUCCESS_TITLE,
+  DEMO_MODE_SUCCESS_MESSAGE,
+  GENERAL_CONSULTATION_OPTION,
+  getPublicApprovedTreatments,
+  getPublicBookingOptions,
+  resolveInitialBookingTreatment,
+  getLocalTodayDateString,
+  validatePreferredDate,
+  validatePhoneFormat,
+  normalizePhoneForSubmission,
+  validateBookingForm,
+  processBookingSubmission,
+};
 
 interface BookingSectionProps {
   compact?: boolean;
@@ -53,32 +65,44 @@ export function BookingSection({
   const statusBannerRef = useRef<HTMLDivElement>(null);
   const idPrefix = isModal ? 'modal-' : '';
 
-  const [form, setForm] = useState<BookingFormState>({
+  const approvedTreatments = useMemo(
+    () => getPublicApprovedTreatments(treatments),
+    [treatments]
+  );
+
+  const [form, setForm] = useState<BookingFormState>(() => ({
     name: '',
     phone: '',
     email: '',
-    treatment: preselectedTreatment,
+    treatment: resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments),
     preferredDate: '',
     message: '',
     privacyConsent: false,
     website_url: '',
-  });
+  }));
 
   useEffect(() => {
-    if (preselectedTreatment) {
-      setForm((prev) => ({ ...prev, treatment: preselectedTreatment }));
+    const resolved = resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments);
+    if (resolved) {
+      setForm((prev) => ({ ...prev, treatment: resolved }));
+    } else if (
+      form.treatment &&
+      form.treatment !== GENERAL_CONSULTATION_OPTION.value &&
+      !approvedTreatments.some((t) => t.slug === form.treatment)
+    ) {
+      setForm((prev) => ({ ...prev, treatment: '' }));
     }
-  }, [preselectedTreatment]);
+  }, [preselectedTreatment, approvedTreatments]);
 
   const [errors, setErrors] = useState<BookingFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSubmitTimestamp, setLastSubmitTimestamp] = useState<number>(0);
   const lastSubmittedFingerprintRef = useRef<string>('');
-  const [serverResponse, setServerResponse] = useState<{
-    status: 'idle' | 'demo_mode' | 'live_enquiry_logged' | 'throttled' | 'error';
-    title: string;
-    message: string;
-  }>({ status: 'idle', title: '', message: '' });
+  const [serverResponse, setServerResponse] = useState<BookingServerResponse>({
+    status: 'idle',
+    title: '',
+    message: '',
+  });
 
   // PHASE 9 — BOOKING SECTION: Gentle upward heading text mask + two short staggered field groups
   useEffect(() => {
@@ -160,49 +184,6 @@ export function BookingSection({
     return () => ctx.revert();
   }, [serverResponse]);
 
-  const validate = (): BookingFormErrors => {
-    const nextErrors: BookingFormErrors = {};
-
-    if (!form.name.trim() || form.name.trim().length < 2) {
-      nextErrors.name = 'Please enter your full name (at least 2 characters).';
-    }
-
-    const cleanedPhone = form.phone.replace(/[\s()-]/g, '');
-    if (!cleanedPhone || !/^\+?[0-9]{7,15}$/.test(cleanedPhone)) {
-      nextErrors.phone = 'Please enter a valid contact phone number (7 to 15 digits).';
-    }
-
-    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      nextErrors.email = 'Please enter a valid email address or leave this optional field blank.';
-    }
-
-    if (!form.treatment) {
-      nextErrors.treatment = 'Please select a procedure or consultation area.';
-    }
-
-    if (!form.preferredDate) {
-      nextErrors.preferredDate = 'Please select a preferred consultation date.';
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selected = new Date(form.preferredDate);
-      if (selected < today) {
-        nextErrors.preferredDate = 'Preferred consultation date cannot be in the past.';
-      }
-    }
-
-    if (form.message.trim().length > 500) {
-      nextErrors.message = 'Please keep your note concise (under 500 characters) and omit medical history.';
-    }
-
-    if (!form.privacyConsent) {
-      nextErrors.privacyConsent =
-        'Please confirm privacy consent to proceed with your consultation enquiry.';
-    }
-
-    return nextErrors;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -210,7 +191,7 @@ export function BookingSection({
       return;
     }
 
-    const validationErrors = validate();
+    const validationErrors = validateBookingForm(form, approvedTreatments);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
@@ -218,17 +199,7 @@ export function BookingSection({
       return;
     }
 
-    // Honeypot check
-    if (form.website_url.trim().length > 0) {
-      setServerResponse({
-        status: 'demo_mode',
-        title: siteContent.bookingConfig.demoNoticeTitle,
-        message: siteContent.bookingConfig.demoNoticeBody,
-      });
-      return;
-    }
-
-    const cleanedPhone = form.phone.replace(/[\s()-]/g, '');
+    const cleanedPhone = form.phone.replace(/[\s().-]/g, '');
     const submissionFingerprint = [
       settings.bookingLiveMode ? 'live' : 'demo',
       form.name.trim().toLowerCase(),
@@ -251,8 +222,8 @@ export function BookingSection({
       return;
     }
 
-    const now = Date.now();
-    if (now - lastSubmitTimestamp < 8000) {
+    const nowMs = Date.now();
+    if (settings.bookingLiveMode && nowMs - lastSubmitTimestamp < 8000) {
       setServerResponse({
         status: 'throttled',
         title: 'Please wait a moment before resubmitting',
@@ -262,130 +233,32 @@ export function BookingSection({
     }
 
     setIsSubmitting(true);
-    setLastSubmitTimestamp(now);
-
-    const requestBody = {
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim() || undefined,
-      treatment: form.treatment,
-      preferredDate: form.preferredDate,
-      message: form.message.trim() || undefined,
-      privacyConsent: form.privacyConsent,
-      website_url: form.website_url,
-      liveMode: settings.bookingLiveMode,
-    };
+    if (settings.bookingLiveMode) {
+      setLastSubmitTimestamp(nowMs);
+    }
 
     try {
-      if (settings.bookingLiveMode) {
-        // Step 1: Save live enquiry to Firebase Firestore (source of truth).
-        // If Firestore save fails, never display a successful booking confirmation.
-        let createdEnquiryId = '';
-        try {
-          createdEnquiryId = await submitEnquiryToCms({
-            name: form.name,
-            phone: form.phone,
-            email: form.email || undefined,
-            treatment: form.treatment,
-            preferredDate: form.preferredDate,
-            message: form.message || undefined,
-            privacyConsent: form.privacyConsent,
-          });
-          lastSubmittedFingerprintRef.current = submissionFingerprint;
-        } catch {
-          setLastSubmitTimestamp(0);
-          setServerResponse({
-            status: 'error',
-            title: 'Unable to Save Consultation Enquiry',
-            message:
-              'Your consultation enquiry could not be saved to the clinic database at this time. No enquiry or appointment has been recorded. Please check your connection and try again.',
-          });
-          return;
-        }
+      const result = await processBookingSubmission({
+        form,
+        bookingLiveMode: settings.bookingLiveMode,
+        approvedTreatments,
+        submitEnquiryToCms,
+      });
 
-        // Step 2: Trigger optional server-side notification via /api/appointments with the created enquiryId.
-        try {
-          const response = await fetch(siteContent.bookingConfig.endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...requestBody,
-              enquiryId: createdEnquiryId,
-            }),
-          });
-          const data = await response.json().catch(() => null);
+      setErrors(result.validationErrors);
+      setServerResponse(result.serverResponse);
 
-          if (response.ok && data?.ok && data?.notificationStatus === 'sent') {
-            setServerResponse({
-              status: 'live_enquiry_logged',
-              title: 'Enquiry Saved for Clinic Coordinator Review',
-              message:
-                'Your consultation enquiry has been saved in the /admin queue and staff notification was dispatched. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-            });
-          } else if (
-            response.ok &&
-            data?.ok &&
-            data?.notificationStatus === 'configuration_pending'
-          ) {
-            setServerResponse({
-              status: 'live_enquiry_logged',
-              title: 'Enquiry Saved for Clinic Coordinator Review',
-              message:
-                'Your consultation enquiry has been saved in the /admin queue for coordinator review (optional automated staff webhook notification is not yet configured). Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-            });
-          } else {
-            setServerResponse({
-              status: 'live_enquiry_logged',
-              title: 'Enquiry Saved — Automated Staff Notification Pending',
-              message:
-                'Your consultation enquiry was saved in the /admin queue for coordinator review, but automated staff webhook notification could not be completed. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-            });
-          }
-        } catch {
-          setServerResponse({
-            status: 'live_enquiry_logged',
-            title: 'Enquiry Saved — Automated Staff Notification Pending',
-            message:
-              'Your consultation enquiry was saved in the /admin queue for coordinator review, but the optional staff notification service was unreachable. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-          });
-        }
-      } else {
-        // Clearly labelled non-deceptive Demo Mode
-        try {
-          const response = await fetch(siteContent.bookingConfig.endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-          });
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok || (data && data.ok === false)) {
-            setLastSubmitTimestamp(0);
-            setServerResponse({
-              status: 'error',
-              title: 'Consultation Request Validation Error',
-              message:
-                data?.message ||
-                'Please check your consultation form details and try again. No appointment has been booked.',
-            });
-            return;
-          }
-        } catch {
-          // Even if the local/serverless endpoint is offline in Demo Mode, keep Demo Mode clearly labelled
-        }
-
-        setServerResponse({
-          status: 'demo_mode',
-          title: siteContent.bookingConfig.demoNoticeTitle,
-          message: siteContent.bookingConfig.demoNoticeBody,
-        });
+      if (result.ok && settings.bookingLiveMode) {
+        lastSubmittedFingerprintRef.current = submissionFingerprint;
+      } else if (!result.ok && settings.bookingLiveMode) {
+        setLastSubmitTimestamp(0);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const minDateString = new Date().toISOString().split('T')[0];
+  const minDateString = getLocalTodayDateString();
   const cleanDigitsPhone = settings.phone.replace(/[^0-9+]/g, '');
   const cleanDigitsWhatsapp = settings.whatsappNumber.replace(/[^0-9]/g, '');
 
@@ -535,13 +408,14 @@ export function BookingSection({
                   } ${errors.treatment ? '!border-red-700' : ''}`}
                 >
                   <option value="">Select Procedure *</option>
-                  {treatments.map((t) => (
+                  {approvedTreatments.map((t) => (
                     <option key={t.slug} value={t.slug}>
-                      {t.title}{' '}
-                      {t.approvalStatus === 'draft_pending_clinic_approval' ? '(Draft)' : ''}
+                      {t.title}
                     </option>
                   ))}
-                  <option value="general-consultation">General Aesthetic Consultation</option>
+                  <option value={GENERAL_CONSULTATION_OPTION.value}>
+                    {GENERAL_CONSULTATION_OPTION.label}
+                  </option>
                 </select>
                 {errors.treatment && (
                   <p
@@ -639,11 +513,21 @@ export function BookingSection({
                     placeholder="Preferred time or non-medical note"
                     value={form.message}
                     aria-invalid={Boolean(errors.message)}
+                    aria-describedby={errors.message ? `${idPrefix}booking-message-error` : undefined}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
                     className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 py-2.5 text-sm text-[#211A17] placeholder:text-[#30251F]/55 ${
                       errors.message ? '!border-red-700' : ''
                     }`}
                   />
+                  {errors.message && (
+                    <p
+                      id={`${idPrefix}booking-message-error`}
+                      role="alert"
+                      className="mt-1 text-xs text-red-800 px-2"
+                    >
+                      {errors.message}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
