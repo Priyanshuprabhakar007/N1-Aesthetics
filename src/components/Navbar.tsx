@@ -4,6 +4,7 @@ import { siteContent } from '../content/site';
 import { useCms } from '../context/CmsContext';
 import { Link, useRouter } from '../lib/router';
 import { gsap, prefersReducedMotion } from '../lib/gsap';
+import { useConsultationModal } from './ConsultationModal';
 
 const LEFT_NAV_LINKS = [
   { label: 'Home', href: '/' },
@@ -16,6 +17,7 @@ const LEFT_NAV_LINKS = [
 export function Navbar() {
   const { pathname } = useRouter();
   const { treatments, role } = useCms();
+  const { openConsultationForm } = useConsultationModal();
   const [isScrolled, setIsScrolled] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [treatmentsDropdownOpen, setTreatmentsDropdownOpen] = useState(false);
@@ -263,12 +265,17 @@ export function Navbar() {
 
         {/* RIGHT: Book Consultation text CTA (with 2px hover upward lift) and minimalist hamburger icon */}
         <div className="gsap-nav-reveal flex items-center gap-5 sm:gap-7 z-10 shrink-0">
-          <Link
-            href="/contact#book-consultation"
-            className="editorial-nav-link editorial-btn-lift hidden sm:inline-flex items-center text-[13px] tracking-[0.03em] text-[#F5F0E9]/90 hover:text-[#E6CDB5] font-light whitespace-nowrap py-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E6CDB5]"
+          <button
+            type="button"
+            onClick={() => {
+              setMenuDrawerOpen(false);
+              setTreatmentsDropdownOpen(false);
+              openConsultationForm();
+            }}
+            className="editorial-nav-link editorial-btn-lift hidden sm:inline-flex items-center text-[13px] tracking-[0.03em] text-[#F5F0E9]/90 hover:text-[#E6CDB5] font-light whitespace-nowrap py-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E6CDB5] cursor-pointer"
           >
             Book Consultation
-          </Link>
+          </button>
 
           <button
             type="button"
@@ -363,13 +370,17 @@ export function Navbar() {
             </ul>
 
             <div className="gsap-drawer-item pt-2 sm:hidden">
-              <Link
-                href="/contact#book-consultation"
-                className="editorial-btn-lift w-full inline-flex items-center justify-center gap-2 bg-[#FFFFFF] text-[#211A17] font-medium py-3.5 px-6 rounded-full text-sm"
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuDrawerOpen(false);
+                  openConsultationForm();
+                }}
+                className="editorial-btn-lift w-full inline-flex items-center justify-center gap-2 bg-[#FFFFFF] text-[#211A17] font-medium py-3.5 px-6 rounded-full text-sm cursor-pointer"
               >
                 <span>Book Consultation</span>
                 <ArrowUpRight className="w-4 h-4" />
-              </Link>
+              </button>
             </div>
           </div>
         </nav>

@@ -18,6 +18,7 @@ import { TestimonialsPage } from './pages/TestimonialsPage';
 import { BlogPage } from './pages/BlogPage';
 import { ContactPage } from './pages/ContactPage';
 import { AdminPage } from './pages/AdminPage';
+import { ConsultationModalProvider } from './components/ConsultationModal';
 import { gsap, ScrollTrigger, prefersReducedMotion } from './lib/gsap';
 
 function AppRoutes() {
@@ -83,29 +84,31 @@ export default function App() {
   return (
     <CmsProvider>
       <RouterProvider>
-        {/*
-          IMPORTANT: Do NOT apply overflow-x-hidden on this wrapper div.
-          Per CSS Overflow Module Level 3, setting overflow-x: hidden on a non-root element
-          forces computed overflow-y: auto, which creates a second vertical scrollbar
-          whenever children animate along the Y axis. Horizontal clipping is handled
-          at the document root via overflow-x: clip in index.css.
-        */}
-        <div className="min-h-screen flex flex-col bg-[#F5EEE8] text-[#211A17]">
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-[#E6CDB5] focus:text-[#211A17] focus:px-4 focus:py-2 focus:rounded-full focus:text-xs focus:font-semibold"
-          >
-            Skip to main content
-          </a>
+        <ConsultationModalProvider>
+          {/*
+            IMPORTANT: Do NOT apply overflow-x-hidden on this wrapper div.
+            Per CSS Overflow Module Level 3, setting overflow-x: hidden on a non-root element
+            forces computed overflow-y: auto, which creates a second vertical scrollbar
+            whenever children animate along the Y axis. Horizontal clipping is handled
+            at the document root via overflow-x: clip in index.css.
+          */}
+          <div className="min-h-screen flex flex-col bg-[#F5EEE8] text-[#211A17]">
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-[#E6CDB5] focus:text-[#211A17] focus:px-4 focus:py-2 focus:rounded-full focus:text-xs focus:font-semibold"
+            >
+              Skip to main content
+            </a>
 
-          <Navbar />
+            <Navbar />
 
-          <main id="main-content" className="flex-1">
-            <AppRoutes />
-          </main>
+            <main id="main-content" className="flex-1">
+              <AppRoutes />
+            </main>
 
-          <Footer />
-        </div>
+            <Footer />
+          </div>
+        </ConsultationModalProvider>
       </RouterProvider>
     </CmsProvider>
   );
