@@ -720,7 +720,7 @@ export const siteContent: SiteContent = {
     whatsappPlaceholder: '[WhatsApp Number — Pending Confirmation]',
     isPhoneConfirmed: false,
     emailPlaceholder: '[appointments@n7aesthetics.example — Pending Confirmation]',
-    addressPlaceholder: '[Clinic Suite & Street Address — Pending Confirmation]',
+    addressPlaceholder: '1849, Sector 80, Mohali, Punjab 160062, India',
     hoursPlaceholder: 'By Prior Appointment (Hours Pending Clinic Confirmation)',
     instagramUrlPlaceholder: 'https://instagram.com',
     instagramHandlePlaceholder: '@n7aesthetics (Pending Confirmation)',

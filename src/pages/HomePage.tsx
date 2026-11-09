@@ -10,6 +10,9 @@ import {
 import { siteContent } from '../content/site';
 import { useCms } from '../context/CmsContext';
 import { Link } from '../lib/router';
+import { resolveWhatsappCtaState } from '../lib/mobileCta';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
+import { ClinicMapEmbed } from '../components/ClinicMapEmbed';
 import { TrustStripIcon } from '../components/ClinicIcons';
 import { DoctorSection } from '../components/DoctorSection';
 import { SignatureTreatments } from '../components/SignatureTreatments';
@@ -215,6 +218,7 @@ function FineLinePointerOverlay({
 
 export function HomePage() {
   const { settings, treatments } = useCms();
+  const whatsappState = resolveWhatsappCtaState(settings);
   const heroRef = useRef<HTMLElement>(null);
 
   const activeSlides = useMemo(() => {
@@ -746,7 +750,7 @@ export function HomePage() {
                         CLINIC COORDINATION
                       </span>
                       <h3 className="font-heading text-2xl text-[#211A17] mt-0.5">
-                        Location, Phone &amp; Hours {settings.isPhoneConfirmed ? '' : '(Placeholders)'}
+                        Location &amp; Consultation Hours
                       </h3>
                     </div>
                     <Link
@@ -758,28 +762,51 @@ export function HomePage() {
                     </Link>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-xs">
                     <div className="flex items-start gap-2.5">
                       <MapPin className="w-4 h-4 text-[#BA9876] shrink-0 mt-0.5" />
                       <div>
                         <p className="font-semibold text-[#211A17]">Clinic Address</p>
-                        <p className="text-[#30251F]/75 mt-0.5">{settings.address}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5">
-                      <Phone className="w-4 h-4 text-[#BA9876] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-[#211A17]">Reception Phone</p>
-                        <p className="text-[#30251F]/75 mt-0.5">{settings.phone}</p>
+                        <p className="text-[#30251F]/75 mt-0.5 leading-relaxed">{settings.address}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <Clock className="w-4 h-4 text-[#BA9876] shrink-0 mt-0.5" />
                       <div>
                         <p className="font-semibold text-[#211A17]">Hours</p>
-                        <p className="text-[#30251F]/75 mt-0.5">{settings.hours}</p>
+                        <p className="text-[#30251F]/75 mt-0.5 leading-relaxed">{settings.hours}</p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Refined Google Maps Embed (Light Mode Roadmap with Red Pin & Get Directions) */}
+                  <div className="pt-3">
+                    <ClinicMapEmbed address={settings.address} variant="light" />
+                  </div>
+
+                  {/* Prominent WhatsApp CTA button */}
+                  <div className="pt-4 mt-auto">
+                    {whatsappState.isAvailable && whatsappState.href ? (
+                      <a
+                        href={whatsappState.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Chat With Us on WhatsApp"
+                        className="editorial-btn-lift w-full inline-flex items-center justify-center gap-2 bg-[#205C46] hover:bg-[#1A4B39] active:bg-[#163E2F] text-[#FFFFFF] font-medium text-xs sm:text-sm px-5 py-3.5 rounded-[16px] shadow-sm transition-all duration-200 group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#205C46]"
+                      >
+                        <WhatsAppIcon className="w-4 h-4 text-[#FFFFFF] shrink-0" />
+                        <span>Chat With Us on WhatsApp</span>
+                        <ArrowUpRight className="w-4 h-4 text-[#FFFFFF] shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </a>
+                    ) : (
+                      <div
+                        aria-disabled="true"
+                        className="w-full inline-flex items-center justify-center gap-2 bg-[#205C46]/50 text-[#FFFFFF]/80 text-xs sm:text-sm px-5 py-3.5 rounded-[16px] cursor-not-allowed select-none text-center"
+                      >
+                        <WhatsAppIcon className="w-4 h-4 text-[#FFFFFF]/80 shrink-0" />
+                        <span>Chat With Us on WhatsApp (Pending Confirmation)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

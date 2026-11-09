@@ -20,6 +20,7 @@ import { ContactPage } from './pages/ContactPage';
 import { AdminPage } from './pages/AdminPage';
 import { ConsultationModalProvider } from './components/ConsultationModal';
 import { MobileStickyCtaBar } from './components/MobileStickyCtaBar';
+import { FloatingWhatsAppBubble } from './components/FloatingWhatsAppBubble';
 import { gsap, ScrollTrigger, prefersReducedMotion } from './lib/gsap';
 
 function AppRoutes() {
@@ -109,6 +110,7 @@ export default function App() {
 
             <Footer />
             <MobileStickyCtaBar />
+            <FloatingWhatsAppBubble />
           </div>
         </ConsultationModalProvider>
       </RouterProvider>

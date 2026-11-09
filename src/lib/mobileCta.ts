@@ -1,11 +1,12 @@
 export const WHATSAPP_PREFILLED_MESSAGE =
-  'Hello N7 Aesthetics, I would like to enquire about a consultation.';
+  'Hello N7 Aesthetics, I would like to enquire about a consultation with Dr. Navjot Singh.';
 
 export interface WhatsappCtaState {
   isAvailable: boolean;
   digitsOnlyPhone: string;
   href: string | null;
 }
+
 
 /**
  * Resolves the mobile WhatsApp CTA state from live CMS settings.
