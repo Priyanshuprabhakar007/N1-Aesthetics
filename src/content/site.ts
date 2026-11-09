@@ -174,6 +174,21 @@ export interface SiteContent {
       description: string;
     }>;
   };
+  expectedOutcomes: {
+    heading: string;
+    description: string;
+    ctaLabel: string;
+    disclaimer: string;
+    items: Array<{
+      id: string;
+      categoryTitle: string;
+      treatmentSlug: string;
+      beforeImage: string;
+      afterImage: string;
+      pairImage: string;
+      alt: string;
+    }>;
+  };
   testimonialsSection: {
     eyebrow: string;
     heading: string;
@@ -639,6 +654,51 @@ export const siteContent: SiteContent = {
         title: 'Body Contouring Archive',
         description:
           'Reserved for consented clinical outcome series with documented follow-up intervals.',
+      },
+    ],
+  },
+  expectedOutcomes: {
+    heading: 'Expected Outcomes',
+    description:
+      'Explore illustrative examples of possible aesthetic changes. These visuals are conceptual and do not represent actual patient results.',
+    ctaLabel: 'View Treatment Possibilities',
+    disclaimer: 'Illustrative only. Not actual patient results. Individual results may vary.',
+    items: [
+      {
+        id: 'outcome-hair-restoration',
+        categoryTitle: 'Hair Restoration',
+        treatmentSlug: 'hair-transplant',
+        beforeImage: '/images/expected-outcomes/hair-before-full.png',
+        afterImage: '/images/expected-outcomes/hair-after-full.png',
+        pairImage: '/images/expected-outcomes/pair-hair.png',
+        alt: 'Illustrative conceptual comparison for Hair Restoration — Left: Before, Right: Expected After',
+      },
+      {
+        id: 'outcome-rhinoplasty',
+        categoryTitle: 'Rhinoplasty',
+        treatmentSlug: 'rhinoplasty',
+        beforeImage: '/images/expected-outcomes/rhinoplasty-before-full.png',
+        afterImage: '/images/expected-outcomes/rhinoplasty-after-full.png',
+        pairImage: '/images/expected-outcomes/pair-rhinoplasty.png',
+        alt: 'Illustrative conceptual comparison for Rhinoplasty — Left: Before, Right: Expected After',
+      },
+      {
+        id: 'outcome-facial-rejuvenation',
+        categoryTitle: 'Facial Rejuvenation',
+        treatmentSlug: 'skin-rejuvenation',
+        beforeImage: '/images/expected-outcomes/facial-before-full.png',
+        afterImage: '/images/expected-outcomes/facial-after-full.png',
+        pairImage: '/images/expected-outcomes/pair-facial.png',
+        alt: 'Illustrative conceptual comparison for Facial Rejuvenation — Left: Before, Right: Expected After',
+      },
+      {
+        id: 'outcome-body-contouring',
+        categoryTitle: 'Body Contouring',
+        treatmentSlug: 'body-contouring',
+        beforeImage: '/images/expected-outcomes/body-before-full.png',
+        afterImage: '/images/expected-outcomes/body-after-full.png',
+        pairImage: '/images/expected-outcomes/pair-body.png',
+        alt: 'Illustrative conceptual comparison for Body Contouring — Left: Before, Right: Expected After',
       },
     ],
   },

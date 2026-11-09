@@ -1,82 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import { useCms } from '../context/CmsContext';
+import { siteContent } from '../content/site';
 import { Link } from '../lib/router';
 import { gsap, prefersReducedMotion } from '../lib/gsap';
 
-interface ComparisonSlot {
-  id: string;
-  categoryTitle: string;
-  treatmentSlug: string;
-  beforeImage: string;
-  afterImage: string;
-  isVerifiedOutcome: boolean;
-}
-
-const DEFAULT_DEVELOPMENT_SLOTS: ComparisonSlot[] = [
-  {
-    id: 'slot-hair-restoration',
-    categoryTitle: 'Hair Restoration',
-    treatmentSlug: 'hair-transplant',
-    beforeImage:
-      '/assets/aistudio/8FK6v_tEi3eMvKGVWR3WMgpyDNLf6VWzPIpjcGDk_JipouMhKymEyBEK3bayWd61CJ2s39RtQZKgvNT9eXxnbR9AuHyYXBm3pDT3kFTMO5IcwBRbYlN2NxcC0t6mxtE6yb1U_JzdmIqxPS8cTTZ1qVl3fa8eGoRGr6D4ASIB6J9oqYee4t4a2qcBiuVn8mfb_77244af0.jpg',
-    afterImage:
-      '/assets/aistudio/8FK6v_tEi3eMvKGVWR3WMgpyDNLf6VWzPIpjcGDk_JipouMhKymEyBEK3bayWd61CJ2s39RtQZKgvNT9eXxnbR9AuHyYXBm3pDT3kFTMO5IcwBRbYlN2NxcC0t6mxtE6yb1U_JzdmIqxPS8cTTZ1qVl3fa8eGoRGr6D4ASIB6J9oqYee4t4a2qcBiuVn8mfb_77244af0.jpg',
-    isVerifiedOutcome: false,
-  },
-  {
-    id: 'slot-rhinoplasty',
-    categoryTitle: 'Rhinoplasty',
-    treatmentSlug: 'rhinoplasty',
-    beforeImage:
-      '/assets/aistudio/HYXaJIOuTeFoptEJwejKPyHC-6cV7t14B0UBgJJSPkG9XB6HSsR8Pn7-XTD7mw7TJjv-3E622YIR8OT9SzNTBUijGMWYYQYa8xmJW3to5_8vn5QcCS5nI2UvWBevDK5HUcWcv-MtIwDtasisVlaedHmbtstcoTOXC3AlEE99M5vyj1-0McNT-8BzaBLgtrrs_a9c1bf80.jpg',
-    afterImage:
-      '/assets/aistudio/HYXaJIOuTeFoptEJwejKPyHC-6cV7t14B0UBgJJSPkG9XB6HSsR8Pn7-XTD7mw7TJjv-3E622YIR8OT9SzNTBUijGMWYYQYa8xmJW3to5_8vn5QcCS5nI2UvWBevDK5HUcWcv-MtIwDtasisVlaedHmbtstcoTOXC3AlEE99M5vyj1-0McNT-8BzaBLgtrrs_a9c1bf80.jpg',
-    isVerifiedOutcome: false,
-  },
-  {
-    id: 'slot-chest-contouring',
-    categoryTitle: 'Chest Contouring',
-    treatmentSlug: 'gynecomastia-correction',
-    beforeImage: '/media/treatment-gynecomastia.jpg',
-    afterImage: '/media/treatment-gynecomastia.jpg',
-    isVerifiedOutcome: false,
-  },
-  {
-    id: 'slot-body-contouring',
-    categoryTitle: 'Body Contouring',
-    treatmentSlug: 'body-contouring',
-    beforeImage: '/media/treatment-body-contouring.jpg',
-    afterImage: '/media/treatment-body-contouring.jpg',
-    isVerifiedOutcome: false,
-  },
-];
-
 export function ResultsSection() {
-  const { consentedResults } = useCms();
   const sectionRef = useRef<HTMLElement>(null);
+  const { heading, description, ctaLabel, disclaimer, items } = siteContent.expectedOutcomes;
 
-  // Merge any verified consented results from CMS into the 4 gallery slots
-  const galleryCards: ComparisonSlot[] = DEFAULT_DEVELOPMENT_SLOTS.map((slot, index) => {
-    const matched =
-      consentedResults.find((r) => r.treatmentSlug === slot.treatmentSlug && r.consentVerified) ||
-      consentedResults[index];
-
-    if (matched && matched.consentVerified && matched.beforeImage && matched.afterImage) {
-      return {
-        id: matched.id,
-        categoryTitle: matched.treatmentTitle || slot.categoryTitle,
-        treatmentSlug: matched.treatmentSlug || slot.treatmentSlug,
-        beforeImage: matched.beforeImage,
-        afterImage: matched.afterImage,
-        isVerifiedOutcome: true,
-      };
-    }
-
-    return slot;
-  });
-
-  // PHASE 8 — REAL RESULTS: Masked heading & CTA reveal + left-to-right staggered comparison cards
+  // Masked heading & CTA reveal + staggered comparison card entrance
   useEffect(() => {
     const sectionEl = sectionRef.current;
     if (!sectionEl || prefersReducedMotion()) return;
@@ -126,6 +58,17 @@ export function ResultsSection() {
         },
         0.16
       );
+
+      tl.from(
+        '.gsap-results-disclaimer',
+        {
+          opacity: 0,
+          y: 8,
+          duration: 0.6,
+          clearProps: 'transform,opacity,visibility',
+        },
+        0.4
+      );
     }, sectionEl);
 
     return () => ctx.revert();
@@ -134,33 +77,33 @@ export function ResultsSection() {
   return (
     <section
       ref={sectionRef}
-      aria-labelledby="real-results-heading"
-      className="w-full bg-[#F5EEE8] border-b border-[#30251F]/12 py-8 sm:py-10"
+      aria-labelledby="expected-outcomes-heading"
+      className="w-full bg-[#F5EEE8] border-b border-[#30251F]/12 py-10 sm:py-14"
     >
       <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
         {/* Desktop layout: Left introductory column (~23%) and Right 4-card gallery (~77%) */}
-        <div className="flex flex-col lg:flex-row lg:items-center gap-7 lg:gap-0">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-0">
           {/* LEFT INTRODUCTORY COLUMN (~23%) */}
-          <div className="w-full lg:w-[23%] lg:border-r lg:border-[#30251F]/14 lg:pr-7 flex flex-col justify-center shrink-0">
+          <div className="w-full lg:w-[23%] lg:border-r lg:border-[#30251F]/14 lg:pr-8 flex flex-col justify-center shrink-0">
             <h2
-              id="real-results-heading"
+              id="expected-outcomes-heading"
               className="font-heading text-[36px] sm:text-[40px] lg:text-[42px] leading-[1.06] tracking-[-0.015em] text-[#211A17] font-normal"
             >
               <span className="editorial-mask-line pb-1">
-                <span className="gsap-results-heading block">Real Results</span>
+                <span className="gsap-results-heading block">{heading}</span>
               </span>
             </h2>
 
-            <p className="gsap-results-intro mt-2.5 font-sans text-xs sm:text-[13px] text-[#30251F]/85 leading-[1.55] max-w-[26ch]">
-              Explore documented patient outcomes from procedures performed at N7 Aesthetics.
+            <p className="gsap-results-intro mt-3 font-sans text-xs sm:text-[13px] text-[#30251F]/85 leading-[1.6] max-w-[28ch]">
+              {description}
             </p>
 
-            <div className="gsap-results-intro mt-5">
+            <div className="gsap-results-intro mt-6">
               <Link
                 href="/results"
                 className="editorial-btn-lift inline-flex items-center gap-1.5 bg-[#E6CDB5] hover:bg-[#dcc0a4] text-[#211A17] text-xs font-medium px-5 py-2.5 rounded-full transition-colors whitespace-nowrap shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#211A17] group"
               >
-                <span>View More Results</span>
+                <span>{ctaLabel}</span>
                 <ArrowUpRight className="w-3.5 h-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
             </div>
@@ -169,75 +112,53 @@ export function ResultsSection() {
           {/* RIGHT GALLERY (~77%):
               Desktop (xl): 4 equal-size comparison cards side by side
               Tablet (md): 2x2 grid
-              Mobile: Horizontal swipeable carousel (no-scrollbar) */}
-          <div className="w-full lg:w-[77%] lg:pl-7">
-            <div className="no-scrollbar flex md:grid md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-4 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-2 md:pb-0 -mx-1 px-1">
-              {galleryCards.map((card) => (
+              Mobile: Horizontal swipeable carousel with snap */}
+          <div className="w-full lg:w-[77%] lg:pl-8">
+            <div className="no-scrollbar flex md:grid md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-2 md:pb-0 -mx-1 px-1">
+              {items.map((card) => (
                 <div
                   key={card.id}
-                  className="gsap-results-card shrink-0 w-[82vw] xs:w-[300px] md:w-auto snap-start"
+                  className="gsap-results-card shrink-0 w-[84vw] xs:w-[310px] md:w-auto snap-start flex flex-col"
                 >
                   <Link
-                    href="/results"
-                    aria-label={`${card.categoryTitle} — ${
-                      card.isVerifiedOutcome
-                        ? 'Verified clinical before and after comparison'
-                        : 'Development placeholder awaiting verified clinical pair'
-                    }`}
-                    className="editorial-btn-lift group relative block rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#211A17]"
+                    href={`/treatments/${card.treatmentSlug}`}
+                    aria-label={`${card.categoryTitle} — Illustrative conceptual comparison preview (Before and Expected After)`}
+                    className="editorial-btn-lift group relative block rounded-[16px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#211A17]"
                   >
-                    {/* Unverified development state badge so placeholder images are never mistaken for surgical change */}
-                    {!card.isVerifiedOutcome && (
-                      <span className="sr-only">
-                        Unpublished development placeholder for {card.categoryTitle}
+                    {/* Top Row: Category Title + Illustrative indicator badge */}
+                    <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
+                      <span className="font-heading text-sm sm:text-base text-[#211A17] font-medium tracking-tight group-hover:text-[#BA9876] transition-colors">
+                        {card.categoryTitle}
                       </span>
-                    )}
+                      <span className="text-[9px] uppercase tracking-[0.14em] font-semibold px-1.5 py-0.5 rounded bg-[#30251F]/8 text-[#30251F]/70 border border-[#30251F]/10">
+                        ILLUSTRATIVE
+                      </span>
+                    </div>
 
-                    {/* Two side-by-side photo panels — clinical photos remain unaltered and un-distorted */}
-                    <div className="grid grid-cols-2 gap-1.5 h-[195px] sm:h-[210px] w-full">
-                      {/* Left Panel: BEFORE */}
-                      <div className="relative h-full w-full rounded-[12px] overflow-hidden bg-[#D8C8B8] border border-transparent group-hover:border-[#BA9876]/45 transition-colors duration-300">
-                        <img
-                          src={card.beforeImage}
-                          alt={
-                            card.isVerifiedOutcome
-                              ? `Before ${card.categoryTitle}`
-                              : `${card.categoryTitle} placeholder panel (Before)`
-                          }
-                          loading="lazy"
-                          className="w-full h-full object-cover object-center select-none"
-                        />
-                        {/* Small dark translucent label bar at bottom */}
-                        <div className="absolute inset-x-0 bottom-0 h-7 bg-[#211A17]/75 backdrop-blur-[2px] flex items-center justify-center">
-                          <span className="font-sans text-[11px] font-medium text-[#F5EEE8] tracking-[0.02em]">
-                            Before
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Right Panel: AFTER */}
-                      <div className="relative h-full w-full rounded-[12px] overflow-hidden bg-[#D8C8B8] border border-transparent group-hover:border-[#BA9876]/45 transition-colors duration-300">
-                        <img
-                          src={card.afterImage}
-                          alt={
-                            card.isVerifiedOutcome
-                              ? `After ${card.categoryTitle}`
-                              : `${card.categoryTitle} placeholder panel (After)`
-                          }
-                          loading="lazy"
-                          className="w-full h-full object-cover object-center select-none"
-                        />
-                        {/* Small dark translucent label bar at bottom */}
-                        <div className="absolute inset-x-0 bottom-0 h-7 bg-[#211A17]/75 backdrop-blur-[2px] flex items-center justify-center">
-                          <span className="font-sans text-[11px] font-medium text-[#F5EEE8] tracking-[0.02em]">
-                            After
-                          </span>
-                        </div>
-                      </div>
+                    {/* Comparison Pair Card */}
+                    <div className="relative rounded-[16px] overflow-hidden bg-[#FAF5F0] border border-[#30251F]/12 shadow-xs group-hover:border-[#BA9876]/50 group-hover:shadow-md transition-all duration-300">
+                      <img
+                        src={card.pairImage}
+                        alt={card.alt}
+                        loading="lazy"
+                        className="w-full h-auto object-cover select-none"
+                      />
                     </div>
                   </Link>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Centered Disclaimer Pill spanning across horizontal hairline rule */}
+        <div className="gsap-results-disclaimer relative mt-10 sm:mt-12 pt-3">
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-[#30251F]/12" aria-hidden="true" />
+          <div className="relative flex justify-center">
+            <div className="bg-[#EFE7E0] border border-[#30251F]/14 rounded-full px-5 sm:px-7 py-1.5 sm:py-2 shadow-xs max-w-[92%] sm:max-w-none">
+              <p className="font-serif italic text-xs sm:text-[13px] text-[#30251F]/85 text-center tracking-normal">
+                {disclaimer}
+              </p>
             </div>
           </div>
         </div>

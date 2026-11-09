@@ -104,7 +104,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/results" className="editorial-footer-link hover:text-[#E6CDB5] transition-colors">
-                  Real Results Archive
+                  Expected Outcomes
                 </Link>
               </li>
               <li>
