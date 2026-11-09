@@ -5,10 +5,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
-  Phone,
-  MessageCircle,
 } from 'lucide-react';
 import { useCms } from '../context/CmsContext';
+import { useRouter } from '../lib/router';
 import { gsap, prefersReducedMotion } from '../lib/gsap';
 import {
   type BookingFormState,
@@ -54,6 +53,7 @@ export {
 interface BookingSectionProps {
   compact?: boolean;
   preselectedTreatment?: string;
+  treatmentSlug?: string;
   isModal?: boolean;
   headingId?: string;
 }
@@ -61,10 +61,12 @@ interface BookingSectionProps {
 export function BookingSection({
   compact = false,
   preselectedTreatment = '',
+  treatmentSlug = '',
   isModal = false,
   headingId,
 }: BookingSectionProps) {
   const { settings, treatments, submitEnquiryToCms } = useCms();
+  const { pathname } = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const statusBannerRef = useRef<HTMLDivElement>(null);
   const idPrefix = isModal ? 'modal-' : '';
@@ -74,13 +76,27 @@ export function BookingSection({
     [treatments]
   );
 
+  // Automatically detect the active treatment slug internally:
+  // - For treatment detail pages: use component prop or detected URL slug (e.g. hair-transplant)
+  // - For general consultation popup and Contact page: use general-consultation
+  // Never displayed to the visitor.
+  const resolvedInternalTreatment = useMemo(() => {
+    const propSlug = (preselectedTreatment || treatmentSlug || '').trim();
+    if (propSlug) return propSlug;
+    if (!isModal) {
+      const match = pathname.match(/^\/treatments\/([a-z0-9\-]+)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return GENERAL_CONSULTATION_OPTION.value;
+  }, [isModal, preselectedTreatment, treatmentSlug, pathname]);
+
   const [form, setForm] = useState<BookingFormState>(() => ({
     name: '',
     phone: '',
     email: '',
-    treatment: isModal
-      ? GENERAL_CONSULTATION_OPTION.value
-      : resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments),
+    treatment: resolvedInternalTreatment,
     preferredDate: '',
     message: '',
     privacyConsent: false,
@@ -88,25 +104,12 @@ export function BookingSection({
   }));
 
   useEffect(() => {
-    if (isModal) {
-      setForm((prev) =>
-        prev.treatment === GENERAL_CONSULTATION_OPTION.value
-          ? prev
-          : { ...prev, treatment: GENERAL_CONSULTATION_OPTION.value }
-      );
-      return;
-    }
-    const resolved = resolveInitialBookingTreatment(preselectedTreatment, approvedTreatments);
-    if (resolved) {
-      setForm((prev) => ({ ...prev, treatment: resolved }));
-    } else if (
-      form.treatment &&
-      form.treatment !== GENERAL_CONSULTATION_OPTION.value &&
-      !approvedTreatments.some((t) => t.slug === form.treatment)
-    ) {
-      setForm((prev) => ({ ...prev, treatment: '' }));
-    }
-  }, [isModal, preselectedTreatment, approvedTreatments]);
+    setForm((prev) =>
+      prev.treatment === resolvedInternalTreatment
+        ? prev
+        : { ...prev, treatment: resolvedInternalTreatment }
+    );
+  }, [resolvedInternalTreatment]);
 
   const [errors, setErrors] = useState<BookingFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,7 +121,7 @@ export function BookingSection({
     message: '',
   });
 
-  // PHASE 9 — BOOKING SECTION: Gentle upward heading text mask + two short staggered field groups
+  // Smooth entrance animation
   useEffect(() => {
     const el = containerRef.current;
     if (!el || prefersReducedMotion()) return;
@@ -159,7 +162,6 @@ export function BookingSection({
         0.08
       );
 
-      // Two short staggered field groups
       tl.from(
         '.gsap-booking-group',
         {
@@ -205,8 +207,9 @@ export function BookingSection({
       return;
     }
 
+    // Unified simplified form validation (name, phone, preferredDate, privacyConsent)
     const validationErrors = validateBookingForm(form, approvedTreatments, new Date(), {
-      isSimplifiedPopup: isModal,
+      isSimplifiedPopup: true,
     });
     setErrors(validationErrors);
 
@@ -216,9 +219,7 @@ export function BookingSection({
     }
 
     const cleanedPhone = form.phone.replace(/[\s().-]/g, '');
-    const effectiveTreatment = isModal
-      ? GENERAL_CONSULTATION_OPTION.value
-      : form.treatment.trim();
+    const effectiveTreatment = resolvedInternalTreatment;
     const submissionFingerprint = [
       settings.bookingLiveMode ? 'live' : 'demo',
       form.name.trim().toLowerCase(),
@@ -258,11 +259,11 @@ export function BookingSection({
 
     try {
       const result = await processBookingSubmission({
-        form,
+        form: { ...form, treatment: effectiveTreatment },
         bookingLiveMode: settings.bookingLiveMode,
         approvedTreatments,
         submitEnquiryToCms,
-        isSimplifiedPopup: isModal,
+        isSimplifiedPopup: true,
       });
 
       setErrors(result.validationErrors);
@@ -279,8 +280,6 @@ export function BookingSection({
   };
 
   const minDateString = getLocalTodayDateString();
-  const cleanDigitsPhone = settings.phone.replace(/[^0-9+]/g, '');
-  const cleanDigitsWhatsapp = settings.whatsappNumber.replace(/[^0-9]/g, '');
 
   const headingText = isModal ? 'Book Your Private Consultation' : 'Book a Consultation';
   const subtitleText = isModal
@@ -327,7 +326,7 @@ export function BookingSection({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className={isModal ? 'space-y-3' : 'space-y-3.5'}>
+        <form onSubmit={handleSubmit} noValidate className="space-y-3 sm:space-y-3.5">
           {/* Honeypot field */}
           <div className="sr-only" aria-hidden="true">
             <label htmlFor={`${idPrefix}n7-website-url`}>Website URL (Leave blank)</label>
@@ -342,10 +341,9 @@ export function BookingSection({
             />
           </div>
 
-          {/* STAGGERED GROUP 1: Primary Contact & Preferred Date */}
-          <div className={`gsap-booking-group ${isModal ? 'space-y-3' : 'space-y-3.5'}`}>
-            {/* Row 1: Full Name & Phone Number */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="gsap-booking-group space-y-3 sm:space-y-3.5">
+            {/* ROW 1: Full Name & Phone Number (two columns on desktop, stacked on mobile) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
               <div>
                 <label
                   htmlFor={`${idPrefix}booking-name`}
@@ -409,192 +407,52 @@ export function BookingSection({
               </div>
             </div>
 
-            {/* Row 2: Preferred Consultation Date (full width in modal; paired with Treatment in standalone section) */}
-            {isModal ? (
-              <div className="relative">
-                <label
-                  htmlFor={`${idPrefix}booking-date`}
-                  className="block text-xs font-medium text-[#211A17] mb-1 px-2"
+            {/* ROW 2: Preferred Consultation Date (full width) */}
+            <div className="relative">
+              <label
+                htmlFor={`${idPrefix}booking-date`}
+                className="block text-xs font-medium text-[#211A17] mb-1 px-2"
+              >
+                Preferred Consultation Date *
+              </label>
+              <input
+                id={`${idPrefix}booking-date`}
+                type="date"
+                required
+                min={minDateString}
+                value={form.preferredDate}
+                aria-invalid={Boolean(errors.preferredDate)}
+                aria-describedby={errors.preferredDate ? `${idPrefix}booking-date-error` : undefined}
+                onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
+                className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm text-[#211A17] ${
+                  errors.preferredDate ? '!border-red-700' : ''
+                }`}
+              />
+              <Calendar
+                className="w-4 h-4 text-[#30251F]/60 pointer-events-none absolute right-4 top-8.5 hidden sm:block"
+                aria-hidden="true"
+              />
+              {errors.preferredDate && (
+                <p
+                  id={`${idPrefix}booking-date-error`}
+                  role="alert"
+                  className="mt-1 text-xs text-red-800 px-2"
                 >
-                  Preferred Consultation Date *
-                </label>
-                <input
-                  id={`${idPrefix}booking-date`}
-                  type="date"
-                  required
-                  min={minDateString}
-                  value={form.preferredDate}
-                  aria-invalid={Boolean(errors.preferredDate)}
-                  aria-describedby={errors.preferredDate ? `${idPrefix}booking-date-error` : undefined}
-                  onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
-                  className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm text-[#211A17] ${
-                    errors.preferredDate ? '!border-red-700' : ''
-                  }`}
-                />
-                <Calendar
-                  className="w-4 h-4 text-[#30251F]/60 pointer-events-none absolute right-4 top-8.5 hidden sm:block"
-                  aria-hidden="true"
-                />
-                {errors.preferredDate && (
-                  <p
-                    id={`${idPrefix}booking-date-error`}
-                    role="alert"
-                    className="mt-1 text-xs text-red-800 px-2"
-                  >
-                    {errors.preferredDate}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label
-                    htmlFor={`${idPrefix}booking-treatment`}
-                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
-                  >
-                    Treatment / Procedure *
-                  </label>
-                  <select
-                    id={`${idPrefix}booking-treatment`}
-                    required
-                    value={form.treatment}
-                    aria-invalid={Boolean(errors.treatment)}
-                    aria-describedby={errors.treatment ? `${idPrefix}booking-treatment-error` : undefined}
-                    onChange={(e) => setForm({ ...form, treatment: e.target.value })}
-                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm ${
-                      !form.treatment ? 'text-[#30251F]/70' : 'text-[#211A17]'
-                    } ${errors.treatment ? '!border-red-700' : ''}`}
-                  >
-                    <option value="">Select Procedure *</option>
-                    {approvedTreatments.map((t) => (
-                      <option key={t.slug} value={t.slug}>
-                        {t.title}
-                      </option>
-                    ))}
-                    <option value={GENERAL_CONSULTATION_OPTION.value}>
-                      {GENERAL_CONSULTATION_OPTION.label}
-                    </option>
-                  </select>
-                  {errors.treatment && (
-                    <p
-                      id={`${idPrefix}booking-treatment-error`}
-                      role="alert"
-                      className="mt-1 text-xs text-red-800 px-2"
-                    >
-                      {errors.treatment}
-                    </p>
-                  )}
-                </div>
+                  {errors.preferredDate}
+                </p>
+              )}
+            </div>
 
-                <div className="relative">
-                  <label
-                    htmlFor={`${idPrefix}booking-date`}
-                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
-                  >
-                    Preferred Consultation Date *
-                  </label>
-                  <input
-                    id={`${idPrefix}booking-date`}
-                    type="date"
-                    required
-                    min={minDateString}
-                    value={form.preferredDate}
-                    aria-invalid={Boolean(errors.preferredDate)}
-                    aria-describedby={errors.preferredDate ? `${idPrefix}booking-date-error` : undefined}
-                    onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
-                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 ${inputPyClass} text-sm text-[#211A17] ${
-                      errors.preferredDate ? '!border-red-700' : ''
-                    }`}
-                  />
-                  <Calendar
-                    className="w-4 h-4 text-[#30251F]/60 pointer-events-none absolute right-4 top-8.5 hidden sm:block"
-                    aria-hidden="true"
-                  />
-                  {errors.preferredDate && (
-                    <p
-                      id={`${idPrefix}booking-date-error`}
-                      role="alert"
-                      className="mt-1 text-xs text-red-800 px-2"
-                    >
-                      {errors.preferredDate}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* STAGGERED GROUP 2: Consent & Submit (Optional Email/Message omitted in modal and compact mode) */}
-          <div className={`gsap-booking-group ${isModal ? 'space-y-3' : 'space-y-3.5'}`}>
-            {!compact && !isModal && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label
-                    htmlFor={`${idPrefix}booking-email`}
-                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
-                  >
-                    Email Address (Optional)
-                  </label>
-                  <input
-                    id={`${idPrefix}booking-email`}
-                    type="email"
-                    placeholder="name@example.com"
-                    value={form.email}
-                    aria-invalid={Boolean(errors.email)}
-                    aria-describedby={errors.email ? `${idPrefix}booking-email-error` : undefined}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 py-2.5 text-sm text-[#211A17] placeholder:text-[#30251F]/55 ${
-                      errors.email ? '!border-red-700' : ''
-                    }`}
-                  />
-                  {errors.email && (
-                    <p
-                      id={`${idPrefix}booking-email-error`}
-                      role="alert"
-                      className="mt-1 text-xs text-red-800 px-2"
-                    >
-                      {errors.email}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor={`${idPrefix}booking-message`}
-                    className="block text-xs font-medium text-[#211A17] mb-1 px-2"
-                  >
-                    Message (Optional)
-                  </label>
-                  <input
-                    id={`${idPrefix}booking-message`}
-                    type="text"
-                    placeholder="Preferred time or non-medical note"
-                    value={form.message}
-                    aria-invalid={Boolean(errors.message)}
-                    aria-describedby={errors.message ? `${idPrefix}booking-message-error` : undefined}
-                    onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    className={`editorial-input w-full rounded-full ${inputBgClass} border px-4 py-2.5 text-sm text-[#211A17] placeholder:text-[#30251F]/55 ${
-                      errors.message ? '!border-red-700' : ''
-                    }`}
-                  />
-                  {errors.message && (
-                    <p
-                      id={`${idPrefix}booking-message-error`}
-                      role="alert"
-                      className="mt-1 text-xs text-red-800 px-2"
-                    >
-                      {errors.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Privacy Consent Checkbox (Compact Part A implementation) */}
+            {/* ROW 3: Privacy Consent Checkbox (Compact Part A implementation) */}
             <div id={isModal ? undefined : 'privacy-notice'} className="pt-0.5 px-1">
-              <label className="flex items-center gap-2 text-xs text-[#30251F]/85 cursor-pointer select-none">
+              <label
+                htmlFor={`${idPrefix}booking-privacy`}
+                className="flex items-center gap-2 text-xs text-[#30251F]/85 cursor-pointer select-none"
+              >
                 <input
+                  id={`${idPrefix}booking-privacy`}
                   type="checkbox"
+                  required
                   checked={form.privacyConsent}
                   aria-invalid={Boolean(errors.privacyConsent)}
                   aria-describedby={errors.privacyConsent ? `${idPrefix}booking-consent-error` : undefined}
@@ -602,7 +460,14 @@ export function BookingSection({
                   className="h-4 w-4 rounded border-[#30251F]/35 text-[#30251F] focus:ring-[#30251F] shrink-0"
                 />
                 <span>
-                  I agree to the <span className="underline underline-offset-2">Privacy Policy</span>. *
+                  I agree to the{' '}
+                  <a
+                    href="/contact#privacy-notice"
+                    className="underline underline-offset-2 hover:text-[#211A17] font-medium"
+                  >
+                    Privacy Policy
+                  </a>
+                  . *
                 </span>
               </label>
               {errors.privacyConsent && (
@@ -616,7 +481,7 @@ export function BookingSection({
               )}
             </div>
 
-            {/* Primary Submit Button */}
+            {/* ROW 4: Primary Full-Width Submit Button */}
             <div className="pt-1">
               <button
                 type="submit"
@@ -629,30 +494,6 @@ export function BookingSection({
                 <ArrowUpRight className="w-4 h-4 text-[#E6CDB5] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </button>
             </div>
-
-            {/* Conditional Mobile Call & WhatsApp CTAs (standalone mode only, when phone confirmed) */}
-            {!isModal && settings.isPhoneConfirmed && cleanDigitsPhone.length >= 7 && (
-              <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <a
-                  href={`tel:${cleanDigitsPhone}`}
-                  className="editorial-btn-lift inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-full border border-[#30251F]/25 text-xs font-medium text-[#211A17] hover:bg-[#E6CDB5]/40 transition-colors"
-                >
-                  <Phone className="w-3.5 h-3.5 text-[#30251F]" />
-                  <span>Call Clinic Directly</span>
-                </a>
-                {cleanDigitsWhatsapp.length >= 7 && (
-                  <a
-                    href={`https://wa.me/${cleanDigitsWhatsapp}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="editorial-btn-lift inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-full border border-[#30251F]/25 text-xs font-medium text-[#211A17] hover:bg-[#E6CDB5]/40 transition-colors"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5 text-[#30251F]" />
-                    <span>WhatsApp Coordinator</span>
-                  </a>
-                )}
-              </div>
-            )}
 
             {/* Accessible Status Banner */}
             {serverResponse.status !== 'idle' && (
