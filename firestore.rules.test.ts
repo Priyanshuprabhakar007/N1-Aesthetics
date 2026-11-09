@@ -30,6 +30,8 @@ import handler, {
 } from './api/appointments';
 import {
   DEMO_MODE_SUCCESS_MESSAGE,
+  LIVE_ENQUIRY_SUCCESS_TITLE,
+  LIVE_ENQUIRY_SUCCESS_MESSAGE,
   GENERAL_CONSULTATION_OPTION,
   getPublicApprovedTreatments,
   getPublicBookingOptions,
@@ -956,7 +958,11 @@ async function runBookingFormAndPublicTreatmentTests(): Promise<void> {
   assert.strictEqual(liveResult503.serverResponse.status, 'live_enquiry_logged');
   assert.strictEqual(
     liveResult503.serverResponse.title,
-    'Enquiry Saved — Automated Staff Notification Pending'
+    LIVE_ENQUIRY_SUCCESS_TITLE
+  );
+  assert.strictEqual(
+    liveResult503.serverResponse.message,
+    LIVE_ENQUIRY_SUCCESS_MESSAGE
   );
 
   // 5. Simplified Consultation Popup Mode (isSimplifiedPopup: true):
@@ -1050,6 +1056,47 @@ async function runBookingFormAndPublicTreatmentTests(): Promise<void> {
     popupLiveApiBody.treatment,
     GENERAL_CONSULTATION_OPTION.value,
     'Simplified popup must supply general-consultation internally to /api/appointments'
+  );
+  assert.strictEqual(popupLiveResult.serverResponse.status, 'live_enquiry_logged');
+  assert.strictEqual(
+    popupLiveResult.serverResponse.title,
+    LIVE_ENQUIRY_SUCCESS_TITLE
+  );
+  assert.strictEqual(
+    popupLiveResult.serverResponse.message,
+    LIVE_ENQUIRY_SUCCESS_MESSAGE
+  );
+
+  // Failure in Firestore write must NEVER report a success message
+  const failedFirestoreResult = await processBookingSubmission({
+    form: {
+      name: 'Kabir Bedi',
+      phone: '+91 98111 22333',
+      email: '',
+      treatment: '',
+      preferredDate: '2026-11-18',
+      message: '',
+      privacyConsent: true,
+      website_url: '',
+    },
+    bookingLiveMode: true,
+    isSimplifiedPopup: true,
+    approvedTreatments: approvedList,
+    submitEnquiryToCms: async () => {
+      throw new Error('Firestore permission denied');
+    },
+    now: fixedNow,
+  });
+  assert.strictEqual(failedFirestoreResult.ok, false);
+  assert.strictEqual(failedFirestoreResult.serverResponse.status, 'error');
+  assert.strictEqual(
+    failedFirestoreResult.serverResponse.title,
+    'Unable to Save Consultation Enquiry'
+  );
+  assert.notStrictEqual(
+    failedFirestoreResult.serverResponse.title,
+    LIVE_ENQUIRY_SUCCESS_TITLE,
+    'Failure must never return the success title'
   );
 
   // 6. Mobile Sticky CTA Bar WhatsApp state:

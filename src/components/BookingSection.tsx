@@ -16,6 +16,8 @@ import {
   type BookingServerResponse,
   DEMO_MODE_SUCCESS_TITLE,
   DEMO_MODE_SUCCESS_MESSAGE,
+  LIVE_ENQUIRY_SUCCESS_TITLE,
+  LIVE_ENQUIRY_SUCCESS_MESSAGE,
   GENERAL_CONSULTATION_OPTION,
   getPublicApprovedTreatments,
   getPublicBookingOptions,
@@ -35,6 +37,8 @@ export {
   type BookingServerResponse,
   DEMO_MODE_SUCCESS_TITLE,
   DEMO_MODE_SUCCESS_MESSAGE,
+  LIVE_ENQUIRY_SUCCESS_TITLE,
+  LIVE_ENQUIRY_SUCCESS_MESSAGE,
   GENERAL_CONSULTATION_OPTION,
   getPublicApprovedTreatments,
   getPublicBookingOptions,
@@ -316,9 +320,11 @@ export function BookingSection({
               {subtitleText}
             </p>
           </div>
-          <span className="gsap-booking-subcopy text-[11px] text-[#30251F]/75 font-medium px-2.5 py-1 rounded-full bg-[#E6CDB5]/35 border border-[#E6CDB5]/60">
-            {settings.bookingLiveMode ? 'CMS Queue Active' : 'Demo Mode'}
-          </span>
+          {!settings.bookingLiveMode && (
+            <span className="gsap-booking-subcopy text-[11px] text-[#30251F]/75 font-medium px-2.5 py-1 rounded-full bg-[#E6CDB5]/35 border border-[#E6CDB5]/60">
+              Demo Mode
+            </span>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} noValidate className={isModal ? 'space-y-3' : 'space-y-3.5'}>
@@ -584,27 +590,26 @@ export function BookingSection({
               </div>
             )}
 
-            {/* Privacy Consent Checkbox */}
+            {/* Privacy Consent Checkbox (Compact Part A implementation) */}
             <div id={isModal ? undefined : 'privacy-notice'} className="pt-0.5 px-1">
-              <label className="flex items-start gap-2.5 text-xs text-[#30251F]/85 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs text-[#30251F]/85 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={form.privacyConsent}
                   aria-invalid={Boolean(errors.privacyConsent)}
                   aria-describedby={errors.privacyConsent ? `${idPrefix}booking-consent-error` : undefined}
                   onChange={(e) => setForm({ ...form, privacyConsent: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-[#30251F]/35 text-[#30251F] focus:ring-[#30251F]"
+                  className="h-4 w-4 rounded border-[#30251F]/35 text-[#30251F] focus:ring-[#30251F] shrink-0"
                 />
                 <span>
-                  I consent to N7 Aesthetics processing this consultation enquiry and understand no
-                  sensitive medical history should be submitted here. *
+                  I agree to the <span className="underline underline-offset-2">Privacy Policy</span>. *
                 </span>
               </label>
               {errors.privacyConsent && (
                 <p
                   id={`${idPrefix}booking-consent-error`}
                   role="alert"
-                  className="mt-1 text-xs text-red-800"
+                  className="mt-1 text-xs text-red-800 px-1"
                 >
                   {errors.privacyConsent}
                 </p>
@@ -625,8 +630,8 @@ export function BookingSection({
               </button>
             </div>
 
-            {/* Conditional Mobile Call & WhatsApp CTAs — ONLY rendered once phone is confirmed by clinic */}
-            {settings.isPhoneConfirmed && cleanDigitsPhone.length >= 7 ? (
+            {/* Conditional Mobile Call & WhatsApp CTAs (standalone mode only, when phone confirmed) */}
+            {!isModal && settings.isPhoneConfirmed && cleanDigitsPhone.length >= 7 && (
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <a
                   href={`tel:${cleanDigitsPhone}`}
@@ -647,10 +652,6 @@ export function BookingSection({
                   </a>
                 )}
               </div>
-            ) : (
-              <p className="text-[11px] text-[#30251F]/65 text-center pt-1">
-                Direct Call &amp; WhatsApp buttons activate automatically once clinic phone is confirmed.
-              </p>
             )}
 
             {/* Accessible Status Banner */}

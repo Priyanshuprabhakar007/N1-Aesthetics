@@ -32,6 +32,10 @@ export const DEMO_MODE_SUCCESS_TITLE = siteContent.bookingConfig.demoNoticeTitle
 export const DEMO_MODE_SUCCESS_MESSAGE =
   'Your consultation request passed validation. Live booking is not yet enabled. No enquiry has been sent or appointment booked.';
 
+export const LIVE_ENQUIRY_SUCCESS_TITLE = 'Consultation Request Received';
+export const LIVE_ENQUIRY_SUCCESS_MESSAGE =
+  'Thank you for contacting N7 Aesthetics. Your consultation enquiry has been received. Our team will contact you to discuss the next steps.';
+
 export const GENERAL_CONSULTATION_OPTION = {
   value: 'general-consultation',
   label: 'General Aesthetic Consultation',
@@ -337,9 +341,8 @@ export async function processBookingSubmission({
       validationErrors: {},
       serverResponse: {
         status: 'live_enquiry_logged',
-        title: 'Enquiry Saved — Automated Staff Notification Pending',
-        message:
-          'Your consultation enquiry was saved in the /admin queue for coordinator review, but the optional staff notification service was unreachable. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+        title: LIVE_ENQUIRY_SUCCESS_TITLE,
+        message: LIVE_ENQUIRY_SUCCESS_MESSAGE,
       },
     };
   }
@@ -358,47 +361,19 @@ export async function processBookingSubmission({
   };
 
   try {
-    const response = await fetchImpl(endpoint, {
+    await fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
-    });
-    const data = await response.json().catch(() => null);
-
-    if (response.ok && data?.ok && data?.notificationStatus === 'sent') {
-      return {
-        ok: true,
-        validationErrors: {},
-        serverResponse: {
-          status: 'live_enquiry_logged',
-          title: 'Enquiry Saved for Clinic Coordinator Review',
-          message:
-            'Your consultation enquiry has been saved in the /admin queue and staff notification was dispatched. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-        },
-      };
-    }
-
-    if (response.ok && data?.ok && data?.notificationStatus === 'configuration_pending') {
-      return {
-        ok: true,
-        validationErrors: {},
-        serverResponse: {
-          status: 'live_enquiry_logged',
-          title: 'Enquiry Saved for Clinic Coordinator Review',
-          message:
-            'Your consultation enquiry has been saved in the /admin queue for coordinator review (optional automated staff webhook notification is not yet configured). Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
-        },
-      };
-    }
+    }).catch(() => null);
 
     return {
       ok: true,
       validationErrors: {},
       serverResponse: {
         status: 'live_enquiry_logged',
-        title: 'Enquiry Saved — Automated Staff Notification Pending',
-        message:
-          'Your consultation enquiry was saved in the /admin queue for coordinator review, but automated staff webhook notification could not be completed. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+        title: LIVE_ENQUIRY_SUCCESS_TITLE,
+        message: LIVE_ENQUIRY_SUCCESS_MESSAGE,
       },
     };
   } catch {
@@ -407,9 +382,8 @@ export async function processBookingSubmission({
       validationErrors: {},
       serverResponse: {
         status: 'live_enquiry_logged',
-        title: 'Enquiry Saved — Automated Staff Notification Pending',
-        message:
-          'Your consultation enquiry was saved in the /admin queue for coordinator review, but the optional staff notification service was unreachable. Please note this is an initial enquiry and not a confirmed calendar appointment until the clinic contacts you.',
+        title: LIVE_ENQUIRY_SUCCESS_TITLE,
+        message: LIVE_ENQUIRY_SUCCESS_MESSAGE,
       },
     };
   }
