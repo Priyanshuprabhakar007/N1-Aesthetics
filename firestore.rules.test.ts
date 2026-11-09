@@ -324,7 +324,64 @@ export async function runRealFirebaseEmulatorRulesTests(): Promise<void> {
     );
     assert.strictEqual(staffAllTreatmentsSnap.docs.length, 2);
 
-    // 7. Storage rules verification
+    // 7. Site Settings access & backward-compatible schema rules:
+    // - Unauthenticated and regular users cannot write to site_settings/main
+    await assertFails(
+      setDoc(doc(regularUserContext.firestore(), 'site_settings', 'main'), {
+        doctorName: 'Dr. Navjot Singh',
+        doctorRole: 'Plastic & Cosmetic Surgeon',
+        doctorShortIntro: 'Intro',
+        doctorPortraitUrl: '/images/dr-navjot-singh.png',
+        credentialsVerified: true,
+        phone: '+919876543210',
+        whatsappNumber: '+919876543210',
+        isPhoneConfirmed: true,
+        email: 'info@n7aesthetics.com',
+        address: 'Clinic Address',
+        hours: 'By Appointment',
+        bookingLiveMode: false,
+        authorUid: 'user_regular_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    // - Staff (admin / editor) can write site_settings/main with full backward-compatible payload
+    await assertSucceeds(
+      setDoc(doc(bootstrapAdminContext.firestore(), 'site_settings', 'main'), {
+        doctorName: 'Dr. Navjot Singh',
+        doctorRole: 'Plastic & Cosmetic Surgeon',
+        doctorShortIntro: 'Intro',
+        doctorPortraitUrl: '/images/dr-navjot-singh.png',
+        credentialsVerified: true,
+        phone: '+919876543210',
+        whatsappNumber: '+919876543210',
+        isPhoneConfirmed: true,
+        email: 'info@n7aesthetics.com',
+        address: 'Clinic Address',
+        hours: 'By Appointment',
+        bookingLiveMode: false,
+        authorUid: 'admin_uid_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    // - Omitting required backward-compatible keys (such as phone or email) fails rule validation
+    await assertFails(
+      setDoc(doc(bootstrapAdminContext.firestore(), 'site_settings', 'main'), {
+        doctorName: 'Dr. Navjot Singh',
+        doctorRole: 'Plastic & Cosmetic Surgeon',
+        doctorShortIntro: 'Intro',
+        doctorPortraitUrl: '/images/dr-navjot-singh.png',
+        credentialsVerified: true,
+        whatsappNumber: '+919876543210',
+        isPhoneConfirmed: true,
+        address: 'Clinic Address',
+        hours: 'By Appointment',
+        bookingLiveMode: false,
+        authorUid: 'admin_uid_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+
+    // 8. Storage rules verification
     const validWebpBytes = new Uint8Array([
       82, 73, 70, 70, 34, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32, 22, 0, 0, 0, 48, 1, 0, 157, 1,
       42, 1, 0, 1, 0, 14, 192, 254, 37, 164, 0, 3, 112, 0, 0, 0, 0,
@@ -448,6 +505,37 @@ async function runAppointmentApiAndContractTests(): Promise<void> {
   assert.ok(
     adminPageSource.includes('const path = `n7_media/${folder}/${filename}`;'),
     'AdminPage.tsx must upload to n7_media/{folder}/{filename}'
+  );
+
+  // Verify AdminPage.tsx Doctor & Clinic Contact Settings visible fields & layout contract
+  assert.ok(
+    !adminPageSource.includes('<label className="block font-medium mb-1">Reception Phone</label>'),
+    'AdminPage.tsx must not render a visible input for Reception Phone'
+  );
+  assert.ok(
+    !adminPageSource.includes('<label className="block font-medium mb-1">Coordination Email</label>'),
+    'AdminPage.tsx must not render a visible input for Coordination Email'
+  );
+  assert.ok(
+    adminPageSource.includes('<label className="block font-medium mb-1">WhatsApp Number</label>'),
+    'AdminPage.tsx must render WhatsApp Number input'
+  );
+  assert.ok(
+    adminPageSource.includes('<label className="block font-medium mb-1">Consultation Hours</label>'),
+    'AdminPage.tsx must render Consultation Hours input'
+  );
+  assert.ok(
+    adminPageSource.includes('<label className="block font-medium mb-1">Clinic Address</label>'),
+    'AdminPage.tsx must render Clinic Address input'
+  );
+  assert.ok(
+    adminPageSource.includes('Confirm Official WhatsApp Number'),
+    'AdminPage.tsx checkbox label must be updated to Confirm Official WhatsApp Number'
+  );
+  assert.ok(
+    cmsContextSource.includes('phone: (typeof next.phone === \'string\' ? next.phone : (settings.phone || defaultSettings.phone)).trim().slice(0, 60),') &&
+      cmsContextSource.includes('email: (typeof next.email === \'string\' ? next.email : (settings.email || defaultSettings.email)).trim().slice(0, 160),'),
+    'CmsContext.tsx must safely preserve phone and email in saveSiteSettings payload for backward-compatibility'
   );
 
   const storedEnquiries = new Map<string, VerifiedFirestoreEnquiryRecord>();

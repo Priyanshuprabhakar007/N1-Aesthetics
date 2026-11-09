@@ -957,15 +957,7 @@ export function AdminPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Reception Phone</label>
-                  <input
-                    type="text"
-                    value={settingsForm.phone}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
-                    className="w-full rounded-xl bg-[#F5EEE8] border border-[#30251F]/20 px-3.5 py-2.5"
-                  />
-                </div>
+                {/* ROW 1: WhatsApp Number | Consultation Hours */}
                 <div>
                   <label className="block font-medium mb-1">WhatsApp Number</label>
                   <input
@@ -974,15 +966,7 @@ export function AdminPage() {
                     onChange={(e) =>
                       setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })
                     }
-                    className="w-full rounded-xl bg-[#F5EEE8] border border-[#30251F]/20 px-3.5 py-2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Coordination Email</label>
-                  <input
-                    type="text"
-                    value={settingsForm.email}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, email: e.target.value })}
+                    placeholder="+91 98765 43210"
                     className="w-full rounded-xl bg-[#F5EEE8] border border-[#30251F]/20 px-3.5 py-2.5"
                   />
                 </div>
@@ -992,9 +976,12 @@ export function AdminPage() {
                     type="text"
                     value={settingsForm.hours}
                     onChange={(e) => setSettingsForm({ ...settingsForm, hours: e.target.value })}
+                    placeholder="By Prior Appointment"
                     className="w-full rounded-xl bg-[#F5EEE8] border border-[#30251F]/20 px-3.5 py-2.5"
                   />
                 </div>
+
+                {/* ROW 2: Clinic Address (full width) */}
                 <div className="sm:col-span-2">
                   <label className="block font-medium mb-1">Clinic Address</label>
                   <input
@@ -1030,7 +1017,7 @@ export function AdminPage() {
                     }
                   />
                   <span>
-                    Confirm Clinic Phone &amp; Unlock Mobile Call / WhatsApp Buttons
+                    Confirm Official WhatsApp Number
                   </span>
                 </label>
                 <label className="flex items-center gap-2.5 cursor-pointer">
